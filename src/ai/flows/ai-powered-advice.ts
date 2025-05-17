@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -69,6 +70,15 @@ const personalizedAdviceFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    return output!;
+    if (!output || 
+        typeof output.advice !== 'string' || 
+        output.advice.trim() === '' || 
+        typeof output.riskAssessment !== 'string' || 
+        output.riskAssessment.trim() === '') {
+      console.error('AI output for personalizedAdviceFlow was invalid or empty:', output);
+      throw new Error('AI did not provide valid advice or risk assessment.');
+    }
+    return output;
   }
 );
+

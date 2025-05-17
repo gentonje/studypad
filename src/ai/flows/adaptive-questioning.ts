@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -57,6 +58,11 @@ const adaptiveQuestioningFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    return output!;
+    if (!output || typeof output.nextQuestion !== 'string' || output.nextQuestion.trim() === '') {
+      console.error('AI output for adaptiveQuestioningFlow was invalid or empty:', output);
+      throw new Error('AI did not provide a valid next question.');
+    }
+    return output;
   }
 );
+
