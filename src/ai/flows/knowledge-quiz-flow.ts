@@ -25,7 +25,7 @@ const KnowledgeQuizInputSchema = z.object({
 export type KnowledgeQuizInput = z.infer<typeof KnowledgeQuizInputSchema>;
 
 const KnowledgeQuizOutputSchema = z.object({
-  nextQuestion: z.string().optional().describe('The next question to ask the user, adapted based on previous answers, topic, and education level. If empty or not provided, it signals the end of the questioning phase for the current topic and education level.'),
+  nextQuestion: z.string().optional().describe('The next question to ask the user, adapted based on previous answers, topic, and education level. If empty, null, or not provided, it signals the end of the questioning phase for the current topic and education level.'),
 });
 export type KnowledgeQuizOutput = z.infer<typeof KnowledgeQuizOutputSchema>;
 
@@ -34,15 +34,15 @@ export async function knowledgeQuizFlow(input: KnowledgeQuizInput): Promise<Know
   const flowOutput = await knowledgeQuizGenkitFlow(input);
   
   // Ensure output structure is valid, especially nextQuestion
-  if (!flowOutput || typeof flowOutput.nextQuestion === 'undefined') {
-    // If AI provides no nextQuestion field at all, treat as end of quiz.
-     console.warn('knowledgeQuizFlow: AI output was missing nextQuestion field. Returning empty nextQuestion.');
+  if (!flowOutput || typeof flowOutput.nextQuestion === 'undefined' || flowOutput.nextQuestion === null) {
+    // If AI provides no nextQuestion field at all, or it's null, treat as end of quiz.
+     console.warn('knowledgeQuizFlow: AI output was missing nextQuestion field or it was null. Returning empty nextQuestion.');
     return { nextQuestion: "" }; // Explicitly return empty string
   }
   if (typeof flowOutput.nextQuestion === 'string' && flowOutput.nextQuestion.trim() === '') {
      console.log('knowledgeQuizFlow: AI returned an empty string for nextQuestion. Ending quiz.');
   } else if (typeof flowOutput.nextQuestion !== 'string') {
-    // If nextQuestion is present but not a string (e.g. null, or other type if schema validation failed silently)
+    // If nextQuestion is present but not a string (e.g. if schema validation failed silently)
     console.error('knowledgeQuizFlow: AI output for nextQuestion was not a string:', flowOutput.nextQuestion, '- Forcing end of quiz.');
     return { nextQuestion: "" }; // Explicitly return empty string
   }
@@ -72,8 +72,8 @@ This is the first question. Start with a foundational question appropriate for t
 Based on the topic, education level, and the conversation history (if any), formulate the next most relevant and insightful question.
 The question should be clear, concise, and appropriate for the {{{educationLevel}}} level.
 Avoid yes/no questions; aim for questions that require a short explanation or factual recall.
-Continue asking questions to explore different facets of the topic.
 
+IMPORTANT: Do not stop after a fixed number of questions. Continue asking questions to explore different facets of the topic.
 If you determine that the topic has been sufficiently explored for the given education level, or if you cannot formulate a relevant follow-up question based on the previous interactions and topic scope, then set 'nextQuestion' to an empty string ("") to signal the end of the quiz.
 
 Do not repeat questions.
@@ -96,5 +96,3 @@ const knowledgeQuizGenkitFlow = ai.defineFlow(
     return output!; // The '!' asserts that output is not null/undefined, which definePrompt guarantees if no error.
   }
 );
-
-    
