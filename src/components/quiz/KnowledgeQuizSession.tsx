@@ -163,7 +163,9 @@ export function KnowledgeQuizSession() {
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
       isCorrect = evalOutput.isCorrect;
       if (isCorrect) {
-        toast({ title: "Correct!", description: "Great job!", variant: "default", duration: 2000 });
+        toast({ title: "Correct!", description: evalOutput.explanation || "Great job!", variant: "default", duration: 2000 });
+      } else {
+        toast({ title: "Incorrect", description: evalOutput.explanation || "Let's keep trying!", variant: "destructive", duration: 2500 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
@@ -307,15 +309,22 @@ export function KnowledgeQuizSession() {
           {history.length > 0 && (
             <CardContent className="p-4 md:p-6 max-h-60">
               <ScrollArea className="h-full pr-3">
-                <div className="space-y-3">
+                <div className="space-y-4"> {/* Increased space-y for better separation */}
                 <h3 className="text-md font-semibold text-muted-foreground mb-2">Previous Questions:</h3>
                 {history.map((item, index) => (
                   <div key={index} className="text-sm p-3 rounded-md bg-muted/30 border border-border/70 shadow-sm">
-                    <p className="font-medium text-card-foreground flex items-center">
-                        <MessageCircle className="w-4 h-4 mr-2 text-primary shrink-0"/> Question: {item.question}
-                        {item.isCorrect && <span className="ml-2 text-2xl">🎉</span>}
+                    <div className="flex items-start">
+                      <MessageCircle className="w-4 h-4 mr-2 text-primary shrink-0 mt-[3px]"/>
+                      <div className="flex-1">
+                        <span className="font-medium text-card-foreground">Question: </span>
+                        <span className="font-medium text-card-foreground whitespace-pre-wrap">{item.question}</span>
+                      </div>
+                      {item.isCorrect && <span className="ml-2 text-xl self-start">🎉</span>}
+                      {item.isCorrect === false && <span className="ml-2 text-xl self-start">🤔</span>}
+                    </div>
+                    <p className="mt-2 text-muted-foreground pl-[calc(1rem+0.5rem)] whitespace-pre-wrap"> {/* 1rem for icon width + 0.5rem for margin = 22px; pl-6 is 24px. mt-2 for clear separation */}
+                      <span className="font-semibold">Your Answer: </span>{item.answer}
                     </p>
-                    <p className="mt-1 text-muted-foreground pl-6">Your Answer: {item.answer}</p>
                   </div>
                 ))}
                 </div>
@@ -331,7 +340,7 @@ export function KnowledgeQuizSession() {
                   name="answer"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xl font-medium text-card-foreground mb-3 block">
+                      <FormLabel className="text-xl font-medium text-card-foreground mb-3 block whitespace-pre-wrap">
                         {currentQuestionText}
                       </FormLabel>
                       <FormControl>
@@ -383,15 +392,15 @@ export function KnowledgeQuizSession() {
                     </CardHeader>
                     <CardContent className="max-h-72">
                          <ScrollArea className="h-full pr-3">
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                             {history.map((item, index) => (
                             <div key={index} className="text-sm p-2 rounded-md bg-muted/30 border border-border/50">
-                                <p className="font-medium text-card-foreground flex items-start">
-                                    <span className="mr-1">{index+1}. {item.question}</span>
-                                    {item.isCorrect && <span className="ml-auto text-xl">🎉</span>}
-                                    {item.isCorrect === false && <span className="ml-auto text-xl">🤔</span>}
-                                </p>
-                                <p className="text-xs text-muted-foreground pl-4">Your Answer: {item.answer}</p>
+                                <div className="font-medium text-card-foreground flex items-start">
+                                    <span className="mr-1 flex-1 whitespace-pre-wrap">{index+1}. {item.question}</span>
+                                    {item.isCorrect && <span className="ml-2 text-xl self-start">🎉</span>}
+                                    {item.isCorrect === false && <span className="ml-2 text-xl self-start">🤔</span>}
+                                </div>
+                                <p className="text-xs text-muted-foreground pl-4 mt-1 whitespace-pre-wrap"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
                             </div>
                             ))}
                             </div>
@@ -417,7 +426,7 @@ export function KnowledgeQuizSession() {
                     <CardContent>
                         <ul className="list-disc pl-5 space-y-1 text-card-foreground">
                         {furtherLearningSuggestions.map((suggestion, index) => (
-                            <li key={index}>{suggestion}</li>
+                            <li key={index} className="whitespace-pre-wrap">{suggestion}</li>
                         ))}
                         </ul>
                     </CardContent>
@@ -437,3 +446,4 @@ export function KnowledgeQuizSession() {
     </Card>
   );
 }
+
