@@ -2,7 +2,8 @@
 'use server';
 
 /**
- * @fileOverview AI-powered advice and risk assessment flow based on user responses.
+ * @fileOverview This file is OBSOLETE. Its functionality has been moved to quiz-summary-flow.ts
+ * AI-powered advice and risk assessment flow based on user responses.
  *
  * - getPersonalizedAdvice - A function that generates personalized advice and risk assessments.
  * - PersonalizedAdviceInput - The input type for the getPersonalizedAdvice function.
@@ -33,52 +34,31 @@ const PersonalizedAdviceOutputSchema = z.object({
 export type PersonalizedAdviceOutput = z.infer<typeof PersonalizedAdviceOutputSchema>;
 
 export async function getPersonalizedAdvice(input: PersonalizedAdviceInput): Promise<PersonalizedAdviceOutput> {
-  return personalizedAdviceFlow(input);
+  // This flow is obsolete.
+  console.warn("Obsolete flow getPersonalizedAdvice called. Please use getQuizSummary from quiz-summary-flow.ts instead.");
+  return {
+    advice: "This advice flow is obsolete.",
+    riskAssessment: "This risk assessment flow is obsolete."
+  };
 }
 
 const prompt = ai.definePrompt({
-  name: 'personalizedAdvicePrompt',
+  name: 'personalizedAdvicePrompt_OBSOLETE',
   input: {schema: PersonalizedAdviceInputSchema},
   output: {schema: PersonalizedAdviceOutputSchema},
-  prompt: `You are an AI-powered HIV counseling assistant. Based on the user's responses to the following questions, provide personalized advice and a risk assessment.
-
-Responses: {{responses}}
-
-Demographics (if available): {{demographics}}
-
-Provide the advice in a supportive and easy-to-understand manner. Be direct, but empathetic.
-
-Risk Assessment:
-Assess the user's risk factors based on their responses. Consider factors such as sexual activity, drug use, and medical history. Provide a clear and concise risk assessment.
-
-Advice:
-Provide personalized advice based on the user's responses and risk assessment. Suggest steps the user can take to reduce their risk and improve their health. Be specific and actionable.
-
-Output the risk assessment and advice in the following format:
-{
-  "advice": "[Personalized advice here]",
-  "riskAssessment": "[Risk assessment here]"
-}
-`,
+  prompt: `This prompt is obsolete.`,
 });
 
 const personalizedAdviceFlow = ai.defineFlow(
   {
-    name: 'personalizedAdviceFlow',
+    name: 'personalizedAdviceFlow_OBSOLETE',
     inputSchema: PersonalizedAdviceInputSchema,
     outputSchema: PersonalizedAdviceOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    if (!output || 
-        typeof output.advice !== 'string' || 
-        output.advice.trim() === '' || 
-        typeof output.riskAssessment !== 'string' || 
-        output.riskAssessment.trim() === '') {
-      console.error('AI output for personalizedAdviceFlow was invalid or empty:', output);
-      throw new Error('AI did not provide valid advice or risk assessment.');
-    }
-    return output;
+    return {
+      advice: "This advice flow is obsolete.",
+      riskAssessment: "This risk assessment flow is obsolete."
+    };
   }
 );
-

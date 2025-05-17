@@ -1,3 +1,4 @@
+
 import type {Metadata} from 'next';
 import { Inter, Roboto_Mono } from 'next/font/google';
 import './globals.css';
@@ -14,8 +15,8 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'CounsellorAI',
-  description: 'AI-Powered HIV Counseling',
+  title: 'Knowledge Quiz AI',
+  description: 'AI-Powered General Knowledge Quiz',
 };
 
 export default function RootLayout({

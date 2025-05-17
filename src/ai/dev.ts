@@ -1,5 +1,6 @@
+
 import { config } from 'dotenv';
 config();
 
-import '@/ai/flows/adaptive-questioning.ts';
-import '@/ai/flows/ai-powered-advice.ts';
+import '@/ai/flows/knowledge-quiz-flow.ts';
+import '@/ai/flows/quiz-summary-flow.ts';
