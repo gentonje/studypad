@@ -30,24 +30,21 @@ const KnowledgeQuizOutputSchema = z.object({
 export type KnowledgeQuizOutput = z.infer<typeof KnowledgeQuizOutputSchema>;
 
 export async function knowledgeQuizFlow(input: KnowledgeQuizInput): Promise<KnowledgeQuizOutput> {
-  console.log('knowledgeQuizFlow: Input received:', JSON.stringify(input, null, 2));
+  // console.log('knowledgeQuizFlow: Input received:', JSON.stringify(input, null, 2));
   const flowOutput = await knowledgeQuizGenkitFlow(input);
   
-  // Ensure output structure is valid, especially nextQuestion
   if (!flowOutput || typeof flowOutput.nextQuestion === 'undefined' || flowOutput.nextQuestion === null) {
-    // If AI provides no nextQuestion field at all, or it's null, treat as end of quiz.
-     console.warn('knowledgeQuizFlow: AI output was missing nextQuestion field or it was null. Returning empty nextQuestion.');
-    return { nextQuestion: "" }; // Explicitly return empty string
+    //  console.warn('knowledgeQuizFlow: AI output was missing nextQuestion field or it was null. Returning empty nextQuestion.');
+    return { nextQuestion: "" }; 
   }
   if (typeof flowOutput.nextQuestion === 'string' && flowOutput.nextQuestion.trim() === '') {
-     console.log('knowledgeQuizFlow: AI returned an empty string for nextQuestion. Ending quiz.');
+    //  console.log('knowledgeQuizFlow: AI returned an empty string for nextQuestion. Ending quiz.');
   } else if (typeof flowOutput.nextQuestion !== 'string') {
-    // If nextQuestion is present but not a string (e.g. if schema validation failed silently)
-    console.error('knowledgeQuizFlow: AI output for nextQuestion was not a string:', flowOutput.nextQuestion, '- Forcing end of quiz.');
-    return { nextQuestion: "" }; // Explicitly return empty string
+    // console.error('knowledgeQuizFlow: AI output for nextQuestion was not a string:', flowOutput.nextQuestion, '- Forcing end of quiz.');
+    return { nextQuestion: "" }; 
   }
 
-  console.log('knowledgeQuizFlow: Output to be sent:', JSON.stringify(flowOutput, null, 2));
+  // console.log('knowledgeQuizFlow: Output to be sent:', JSON.stringify(flowOutput, null, 2));
   return flowOutput;
 }
 
@@ -73,8 +70,10 @@ Based on the topic, education level, and the conversation history (if any), form
 The question should be clear, concise, and appropriate for the {{{educationLevel}}} level.
 Avoid yes/no questions; aim for questions that require a short explanation or factual recall.
 
-IMPORTANT: Do not stop after a fixed number of questions. Continue asking questions to explore different facets of the topic.
-If you determine that the topic has been sufficiently explored for the given education level, or if you cannot formulate a relevant follow-up question based on the previous interactions and topic scope, then set 'nextQuestion' to an empty string ("") to signal the end of the quiz.
+IMPORTANT: Your primary objective is to conduct a comprehensive quiz. Aim for a minimum of 20 questions if the topic and education level can meaningfully support this number while maintaining question quality and relevance.
+Do not stop asking just because a certain number of questions have been asked if the topic still has facets to explore appropriate for the user's level.
+However, prioritize relevance and depth. If, after thorough exploration, you find that the topic is genuinely exhausted for the given education level and you cannot formulate further distinct, high-quality, and meaningful questions, then you may set 'nextQuestion' to an empty string ("") to signal the end of the quiz, even if fewer than 20 questions have been asked.
+If the topic is rich and the education level allows, you can go beyond 20 questions to ensure comprehensive coverage.
 
 Do not repeat questions.
 Generate only the next question.
@@ -83,16 +82,13 @@ Generate only the next question.
 
 const knowledgeQuizGenkitFlow = ai.defineFlow(
   {
-    name: 'knowledgeQuizGenkitFlow', // Renamed to avoid conflict with exported wrapper
+    name: 'knowledgeQuizGenkitFlow', 
     inputSchema: KnowledgeQuizInputSchema,
     outputSchema: KnowledgeQuizOutputSchema,
   },
   async (input: KnowledgeQuizInput) => {
     const {output} = await knowledgeQuizPrompt(input);
-    // The prompt already asks the AI to return an empty string for nextQuestion to end the quiz.
-    // The schema allows nextQuestion to be optional or a string.
-    // If the AI returns nothing for nextQuestion (undefined in output object), or an empty string, it signals end.
-    // The wrapper function `knowledgeQuizFlow` handles potential null/undefined from the AI more robustly.
-    return output!; // The '!' asserts that output is not null/undefined, which definePrompt guarantees if no error.
+    return output!; 
   }
 );
+

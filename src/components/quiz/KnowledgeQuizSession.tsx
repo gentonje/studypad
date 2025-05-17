@@ -44,7 +44,7 @@ export function KnowledgeQuizSession() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [topic, setTopic] = useState<string>("");
   const [educationLevel, setEducationLevel] = useState<EducationLevel>("HighSchool");
-  const [isLoading, setIsLoading] = useState(false); // Combined loading state
+  const [isLoading, setIsLoading] = useState(false);
 
   const { toast } = useToast();
 
@@ -55,8 +55,6 @@ export function KnowledgeQuizSession() {
       educationLevel: "HighSchool",
     },
   });
-  // console.log("KnowledgeQuizSession: configForm instance:", configForm);
-
 
   const answerForm = useForm<AnswerFormData>({
     resolver: zodResolver(answerFormSchema),
@@ -66,8 +64,7 @@ export function KnowledgeQuizSession() {
   });
 
   useEffect(() => {
-    // Optional: If educationLevel influences something globally on change, logic can go here.
-    console.log("Education level changed to:", educationLevel);
+    // console.log("Education level changed to:", educationLevel);
   }, [educationLevel]);
 
 
@@ -77,14 +74,11 @@ export function KnowledgeQuizSession() {
     setErrorMessage(null);
     try {
       const input: KnowledgeQuizInput = { previousAnswers: [], topic: currentTopic, educationLevel: currentEducationLevel };
-      console.log("KnowledgeQuizSession: Fetching initial question with input:", input);
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
-      console.log("KnowledgeQuizSession: Received initial question output:", output);
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
-        console.warn("KnowledgeQuizSession: AI did not provide an initial question. Proceeding to summary.");
         fetchQuizSummary(currentTopic, currentEducationLevel, []);
       }
     } catch (error) {
@@ -98,7 +92,6 @@ export function KnowledgeQuizSession() {
   };
 
   const handleConfigSubmit: SubmitHandler<ConfigFormData> = (data) => {
-    console.log("KnowledgeQuizSession: Configuration submitted:", data);
     setTopic(data.topic);
     setEducationLevel(data.educationLevel);
     setHistory([]); 
@@ -111,15 +104,12 @@ export function KnowledgeQuizSession() {
     setErrorMessage(null);
     try {
       const input: KnowledgeQuizInput = { previousAnswers: updatedHistory, topic: currentTopic, educationLevel: currentEducationLevel };
-      console.log("KnowledgeQuizSession: Fetching next question with input:", input);
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
-      console.log("KnowledgeQuizSession: Received next question output:", output);
 
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
-        console.log("KnowledgeQuizSession: No more questions from AI. Proceeding to summary.");
         fetchQuizSummary(currentTopic, currentEducationLevel, updatedHistory);
       }
     } catch (error) {
@@ -143,9 +133,7 @@ export function KnowledgeQuizSession() {
       }, {} as Record<string, string>);
 
       const input: QuizSummaryInput = { topic: currentTopic, educationLevel: currentEducationLevel, responses, conversationHistory: finalHistory };
-      console.log("KnowledgeQuizSession: Fetching quiz summary with input:", input);
       const output: QuizSummaryOutput = await getQuizSummary(input);
-      console.log("KnowledgeQuizSession: Received quiz summary output:", output);
       setSummaryText(output.summary);
       setFurtherLearningSuggestions(output.furtherLearningSuggestions);
       setCurrentStep('summary');
@@ -180,25 +168,23 @@ export function KnowledgeQuizSession() {
     setFurtherLearningSuggestions(null);
     setErrorMessage(null);
     setTopic("");
-    // setEducationLevel("HighSchool"); 
     configForm.reset({ topic: "", educationLevel: "HighSchool" }); 
     answerForm.reset();
     setIsLoading(false);
   };
 
   const getLoadingMessage = () => {
-    // This function remains the same, but its usage context changes as there's no fixed total.
-    if (currentQuestionText && !summaryText && currentStep === 'loading') return "Getting next question...";
-    if (!currentQuestionText && !summaryText && currentStep === 'loading') return "Preparing your quiz..."; // For initial load
-    if (currentStep === 'loading' && summaryText === null && history.length > 0) return "Generating your summary..."; // When transitioning to summary
+    if (currentStep === 'loading') {
+        if (!currentQuestionText && !summaryText && history.length === 0) return "Preparing your quiz..."; // Initial load for config
+        if (currentQuestionText && !summaryText) return "Getting next question..."; // Fetching next question
+        if (summaryText === null && history.length > 0) return "Generating your summary..."; // Transitioning to summary
+    }
     return "Loading...";
   };
   
-  console.log("KnowledgeQuizSession: Rendering. Current step:", currentStep, "IsLoading:", isLoading);
+  // console.log("KnowledgeQuizSession: Rendering. Current step:", currentStep, "IsLoading:", isLoading);
 
   if (isLoading && currentStep !== 'questioning' && currentStep !== 'summary' && currentStep !== 'config' && currentStep !== 'error') {
-    // This loading state is for transitions between major steps like initial load, or when fetching summary.
-    // Loading during question fetching is handled by disabling the submit button.
     return (
       <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
         <CardContent className="p-6 md:p-8 min-h-[300px] flex flex-col items-center justify-center text-center">
@@ -229,9 +215,11 @@ export function KnowledgeQuizSession() {
 
   return (
     <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
+      {/* <div style={{border: '2px solid red', padding: '10px', margin: '10px'}}>
+        FORCED RENDER TEST - INSIDE CARD. Current step: {currentStep}, isLoading: {String(isLoading)}, Topic: {topic}, EduLevel: {educationLevel}, Error: {errorMessage}
+      </div> */}
       {currentStep === 'config' && (
         <>
-        {/* Static config content. useForm() has been called. Form fields would go here. */}
           <CardHeader className="bg-muted/50 p-4 md:p-6 border-b">
             <div className="flex items-center gap-3">
               <BookOpen className="w-8 h-8 text-primary" />
@@ -241,7 +229,7 @@ export function KnowledgeQuizSession() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-6 md:p-8" style={{border: '2px solid orange', padding: '10px'}}>
+          <CardContent className="p-6 md:p-8">
              <Form {...configForm}>
               <form onSubmit={configForm.handleSubmit(handleConfigSubmit)} className="space-y-6">
                 <FormField
@@ -387,3 +375,4 @@ export function KnowledgeQuizSession() {
     </Card>
   );
 }
+
