@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check, ArrowRight, Image as ImageIcon, ExternalLink, ThumbsUp, Languages, FileText, XCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
@@ -36,7 +37,7 @@ const readFileAsDataURI = (file: File): Promise<string> => {
 const configFormSchema = z.object({
   topic: z.string().min(3, { message: "Topic must be at least 3 characters." }).max(100, {message: "Topic is too long."}),
   educationLevel: EducationLevels,
-  language: SupportedLanguages,
+  language: SupportedLanguages.default("English"),
 });
 type ConfigFormData = z.infer<typeof configFormSchema>;
 
@@ -64,9 +65,9 @@ export function KnowledgeQuizSession() {
   const [furtherLearningSuggestions, setFurtherLearningSuggestions] = useState<string[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  const [topic, setTopic] = useState<string>(""); // Retained for header display, form holds source of truth
-  const [educationLevel, setEducationLevel] = useState<EducationLevel>("HighSchool"); // Retained for header display
-  const [language, setLanguage] = useState<SupportedLanguage>("English"); // Retained for header display
+  const [topic, setTopic] = useState<string>(""); 
+  const [educationLevel, setEducationLevel] = useState<EducationLevel>("HighSchool"); 
+  const [language, setLanguage] = useState<SupportedLanguage>("English"); 
 
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [configPdfDataUri, setConfigPdfDataUri] = useState<string | null>(null);
@@ -97,16 +98,6 @@ export function KnowledgeQuizSession() {
     },
   });
 
-  // useEffect(() => {
-  //   const subscription = configForm.watch((value, { name, type }) => {
-  //     if (name === 'educationLevel') {
-  //       // console.log('[EducationLevel Form Watch] New educationLevel:', value.educationLevel);
-  //     }
-  //   });
-  //   return () => subscription.unsubscribe();
-  // }, [configForm.watch]);
-
-
   const fetchInitialQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, currentPdfDataUri: string | null) => {
     console.log("KnowledgeQuizSession: Fetching initial question with params:", { currentTopic, currentEducationLevel, currentLanguage, pdfPresent: !!currentPdfDataUri });
     setIsLoading(true);
@@ -125,14 +116,13 @@ export function KnowledgeQuizSession() {
         language: currentLanguage,
         pdfDataUri: currentPdfDataUri 
       };
-      console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow (initial):", input);
+      // console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow (initial):", input);
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
         setErrorMessage(`Could not generate the first question for this topic/level${currentPdfDataUri ? '/PDF' : ''}. Please try another combination or check the PDF content.`);
-        // Proceed to summary even if no questions were asked, as per existing logic.
         fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, [], currentPdfDataUri);
       }
     } catch (error) {
@@ -147,10 +137,10 @@ export function KnowledgeQuizSession() {
   };
 
   const handleConfigSubmit: SubmitHandler<ConfigFormData> = async (data) => {
-    console.log("KnowledgeQuizSession: Config form submitted with data:", data);
-    setTopic(data.topic); // For header display
-    setEducationLevel(data.educationLevel); // For header display
-    setLanguage(data.language); // For header display
+    // console.log("KnowledgeQuizSession: Config form submitted with data:", data);
+    setTopic(data.topic); 
+    setEducationLevel(data.educationLevel); 
+    setLanguage(data.language); 
     setHistory([]);
     setIncorrectlyAnsweredQuestions([]);
     setIsReviewMode(false);
@@ -163,20 +153,19 @@ export function KnowledgeQuizSession() {
       setCurrentStep('loading');
       setErrorMessage("Processing PDF..."); 
       try {
-        console.log("KnowledgeQuizSession: Reading PDF file:", pdfFile.name);
+        // console.log("KnowledgeQuizSession: Reading PDF file:", pdfFile.name);
         generatedPdfDataUri = await readFileAsDataURI(pdfFile);
         setConfigPdfDataUri(generatedPdfDataUri); 
         toast({ title: "PDF Processed", description: `${pdfFile.name} will be used for context.`, variant: "default" });
-        setErrorMessage(null); // Clear PDF processing message
+        setErrorMessage(null); 
       } catch (error) {
         console.error("KnowledgeQuizSession: Error reading PDF file:", error);
         const errorMsg = error instanceof Error ? error.message : "Could not read file";
         toast({ title: "PDF Error", description: `${errorMsg}. Continuing without PDF.`, variant: "destructive" });
         setErrorMessage(`Could not process PDF: ${errorMsg}. Continuing without it.`);
         setConfigPdfDataUri(null); 
-        setPdfFile(null); // Clear the invalid file
+        setPdfFile(null); 
       }
-      // setIsLoading(false) handled by fetchInitialQuestion's finally
     } else {
         setConfigPdfDataUri(null); 
     }
@@ -200,14 +189,14 @@ export function KnowledgeQuizSession() {
         language: currentLanguage,
         pdfDataUri: currentPdfDataUri, 
       };
-      console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow (next):", input);
+      // console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow (next):", input);
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
 
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
-        setIncorrectlyAnsweredQuestions(updatedHistory.filter(item => item.isCorrect === false)); // Only strictly incorrect
+        setIncorrectlyAnsweredQuestions(updatedHistory.filter(item => item.isCorrect === false)); 
         fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, updatedHistory, currentPdfDataUri); 
       }
     } catch (error) {
@@ -243,11 +232,11 @@ export function KnowledgeQuizSession() {
         responses, 
         conversationHistory: finalHistory 
       };
-      console.log("KnowledgeQuizSession: Input to getQuizSummary:", input);
+      // console.log("KnowledgeQuizSession: Input to getQuizSummary:", input);
       const output: QuizSummaryOutput = await getQuizSummary(input);
       setSummaryText(output.summary);
       setFurtherLearningSuggestions(output.furtherLearningSuggestions);
-      setIncorrectlyAnsweredQuestions(finalHistory.filter(item => item.isCorrect === false)); // Only strictly incorrect
+      setIncorrectlyAnsweredQuestions(finalHistory.filter(item => item.isCorrect === false)); 
       setCurrentStep('summary');
       toast({ title: "Quiz Complete!", description: "Personalized summary generated.", variant: "default" });
     } catch (error) {
@@ -285,13 +274,14 @@ export function KnowledgeQuizSession() {
         language: formConfig.language,
         pdfDataUri: configPdfDataUri, 
       };
-      console.log("KnowledgeQuizSession: Input to evaluateAnswer:", evalInput);
+      // console.log("KnowledgeQuizSession: Input to evaluateAnswer:", evalInput);
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
-      console.log("KnowledgeQuizSession: Output from evaluateAnswer:", evalOutput); 
+      // console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); 
       
       isCorrectUserAnswer = evalOutput.isCorrect;
       explanationText = evalOutput.explanation || (isCorrectUserAnswer ? "Great job!" : "That's not quite right, let's look at why.");
       imgSuggestion = evalOutput.imageSuggestion;
+      // console.log("KnowledgeQuizSession: Image suggestion from AI:", imgSuggestion);
 
       if (isCorrectUserAnswer) {
         toast({ icon: <ThumbsUp className="text-green-500 mr-1" />, title: "Correct! 🎉", description: "See explanation below.", variant: "default", duration: 3000 });
@@ -319,15 +309,14 @@ export function KnowledgeQuizSession() {
         const updatedReviewItems = [...incorrectlyAnsweredQuestions];
         const originalQuestionToUpdate = updatedReviewItems[currentReviewQuestionIndex];
         updatedReviewItems[currentReviewQuestionIndex] = {
-            ...originalQuestionToUpdate, // Keep original question
-            answer: data.answer, // Update with new answer attempt
+            ...originalQuestionToUpdate, 
+            answer: data.answer, 
             isCorrect: isCorrectUserAnswer, 
             explanation: explanationText, 
             imageSuggestion: imgSuggestion 
         };
         setIncorrectlyAnsweredQuestions(updatedReviewItems);
         
-        // Also update the main history
         const mainHistoryIndex = history.findIndex(h => h.question === originalQuestionToUpdate.question);
         if (mainHistoryIndex > -1) {
             const updatedMainHistory = [...history];
@@ -362,7 +351,6 @@ export function KnowledgeQuizSession() {
             setCurrentStep('questioning');
         } else {
             setIsReviewMode(false);
-            // After review, go to summary again, this time it will show reviewed answers
             fetchQuizSummary(formConfig.topic, formConfig.educationLevel, formConfig.language, history, configPdfDataUri); 
             toast({title: "Review Complete!", description: "You've reviewed all incorrect answers.", variant: "default"});
         }
@@ -372,14 +360,12 @@ export function KnowledgeQuizSession() {
   };
 
   const handleStartReview = () => {
-    // Use the main history to filter for incorrect questions to ensure explanations are up-to-date
     const questionsToReview = history.filter(item => item.isCorrect === false);
     if (questionsToReview.length > 0) {
         setIncorrectlyAnsweredQuestions(questionsToReview);
         setIsReviewMode(true);
         setCurrentReviewQuestionIndex(0);
         setCurrentQuestionText(questionsToReview[0].question);
-        // Do not pre-fill answer in review mode, user should re-attempt
         answerForm.reset(); 
         setCurrentExplanation(null); 
         setCurrentImageSuggestion(null); 
@@ -428,7 +414,7 @@ export function KnowledgeQuizSession() {
   };
 
   const getLoadingMessage = () => {
-    if (errorMessage && errorMessage.startsWith("Processing PDF...")) return errorMessage; // Keep this specific message
+    if (errorMessage && errorMessage.startsWith("Processing PDF...")) return errorMessage; 
     if (isEvaluating && !showExplanationSection) return "Evaluating your answer...";
     if (currentStep === 'loading') {
         if (!currentQuestionText && !summaryText && history.length === 0 && !isReviewMode) return "Preparing your quiz...";
@@ -456,7 +442,7 @@ export function KnowledgeQuizSession() {
     );
   }
   
-  if (errorMessage && currentStep !== 'loading' && !errorMessage.startsWith("Processing PDF...")) { // Show general error if not a loading message
+  if (errorMessage && currentStep !== 'loading' && !errorMessage.startsWith("Processing PDF...")) { 
     return (
       <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
         <CardHeader className="bg-muted/50 p-1 border-b">
@@ -512,14 +498,16 @@ export function KnowledgeQuizSession() {
                   control={configForm.control}
                   name="educationLevel"
                   render={({ field }) => {
+                    // console.log("[EducationLevel Field Render] field.value:", field.value);
                     return (
                       <FormItem>
                         <FormLabel className="text-lg">Education Level</FormLabel>
                         <Select
                           onValueChange={(value) => {
+                            // console.log("[EducationLevel Select onValueChange] selected value:", value);
                             field.onChange(value as EducationLevel);
                           }}
-                          value={field.value} 
+                          value={field.value}
                         >
                           <FormControl>
                             <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
@@ -602,15 +590,38 @@ export function KnowledgeQuizSession() {
       {currentStep === 'questioning' && currentQuestionText && (
         <>
           <CardHeader className="bg-muted/50 p-1 border-b">
-             <CardTitle className="text-xl text-center sm:text-left text-primary">
-                {isReviewMode ? "Reviewing: " : "Topic: "}
-                <span className="font-semibold">{formValuesForHeader.topic}</span>
-                {configPdfDataUri && <FileText className="inline h-5 w-5 ml-1 align-middle text-muted-foreground" title="PDF Context Active"/>}
-             </CardTitle>
-             <CardDescription className="text-center sm:text-left text-xs">
-                Level: {formValuesForHeader.educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {formValuesForHeader.language} |
-                {isReviewMode ? ` Review Question ${currentReviewQuestionIndex + 1} of ${incorrectlyAnsweredQuestions.length}` : ` Question ${history.length + (showExplanationSection ? 0 : 1)}`}
-             </CardDescription>
+            <div className="flex justify-between items-center">
+                <div>
+                    <CardTitle className="text-xl text-primary">
+                        {isReviewMode ? "Reviewing: " : "Topic: "}
+                        <span className="font-semibold">{formValuesForHeader.topic}</span>
+                        {configPdfDataUri && <FileText className="inline h-5 w-5 ml-1 align-middle text-muted-foreground" title="PDF Context Active"/>}
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                        Level: {formValuesForHeader.educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {formValuesForHeader.language} |
+                        {isReviewMode ? ` Review Question ${currentReviewQuestionIndex + 1} of ${incorrectlyAnsweredQuestions.length}` : ` Question ${history.length + (showExplanationSection ? 0 : 1)}`}
+                    </CardDescription>
+                </div>
+                {configPdfDataUri && (
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="ml-1">
+                                <FileText className="mr-1 h-4 w-4" /> View PDF
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="w-[90vw] max-w-[1200px] h-[90vh] flex flex-col p-1">
+                            <DialogHeader className='p-1'>
+                                <DialogTitle>PDF Document: {pdfFile?.name || 'Uploaded PDF'}</DialogTitle>
+                            </DialogHeader>
+                            <iframe
+                                src={configPdfDataUri}
+                                title="PDF Document Viewer"
+                                className="flex-grow border-0 w-full"
+                            />
+                        </DialogContent>
+                    </Dialog>
+                )}
+            </div>
           </CardHeader>
 
            {history.length > 0 && !showExplanationSection && !isReviewMode && (
@@ -673,6 +684,7 @@ export function KnowledgeQuizSession() {
                       {currentImageSuggestion && (
                         <div className="mt-1 p-1 border-t border-green-200 dark:border-green-700/30">
                             <p className="text-xs text-green-600 dark:text-green-400/80 mb-1 italic">Suggested image for clarity:</p>
+                            {/* console.log("Rendering image with suggestion:", currentImageSuggestion); */}
                             <Image
                                 src={`https://placehold.co/300x200.png`}
                                 alt={currentImageSuggestion || "Visual aid for explanation"}
@@ -728,7 +740,34 @@ export function KnowledgeQuizSession() {
                 <CheckCircle2 className="w-10 h-10 text-accent mr-1" />
                 <CardTitle className="text-2xl">Quiz Summary</CardTitle>
             </div>
-            <CardDescription>Topic: <span className="font-semibold">{formValuesForHeader.topic}</span> {configPdfDataUri && <FileText className="inline h-4 w-4 ml-1 align-middle text-muted-foreground" title="PDF Context Active"/>} | Level: {formValuesForHeader.educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {formValuesForHeader.language}</CardDescription>
+            <div className="flex justify-center items-center space-x-1">
+                <CardDescription>
+                    Topic: <span className="font-semibold">{formValuesForHeader.topic}</span> 
+                    {configPdfDataUri && <FileText className="inline h-4 w-4 ml-1 align-middle text-muted-foreground" title="PDF Context Active"/>} | 
+                    Level: {formValuesForHeader.educationLevel.replace(/([A-Z])/g, ' $1').trim()} | 
+                    Language: {formValuesForHeader.language}
+                </CardDescription>
+                {configPdfDataUri && (
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="xs" className="ml-1 px-1 py-0.5 h-auto text-xs">
+                                <FileText className="mr-0.5 h-3 w-3" /> View PDF
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="w-[90vw] max-w-[1200px] h-[90vh] flex flex-col p-1">
+                            <DialogHeader className='p-1'>
+                                <DialogTitle>PDF Document: {pdfFile?.name || 'Uploaded PDF'}</DialogTitle>
+                            </DialogHeader>
+                            <iframe
+                                src={configPdfDataUri}
+                                title="PDF Document Viewer"
+                                className="flex-grow border-0 w-full"
+                            />
+                        </DialogContent>
+                    </Dialog>
+                )}
+            </div>
+
           </CardHeader>
           <CardContent className="p-1 space-y-1">
             {history.length > 0 && (
@@ -847,4 +886,3 @@ export function KnowledgeQuizSession() {
     </Card>
   );
 }
-
