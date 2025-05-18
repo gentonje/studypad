@@ -78,6 +78,11 @@ export function KnowledgeQuizSession() {
     },
   });
 
+  useEffect(() => {
+    // Example of using educationLevel to adjust something, e.g., complexity (not implemented here)
+    // console.log("KnowledgeQuizSession: Education level set to:", educationLevel);
+  }, [educationLevel]);
+
   const fetchInitialQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel) => {
     setIsLoading(true);
     setCurrentStep('loading');
@@ -92,6 +97,8 @@ export function KnowledgeQuizSession() {
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
+        // No initial question could be generated, go to summary/error
+        setErrorMessage("Could not generate the first question for this topic/level. Please try another.");
         fetchQuizSummary(currentTopic, currentEducationLevel, []);
       }
     } catch (error) {
@@ -192,7 +199,7 @@ export function KnowledgeQuizSession() {
         educationLevel: educationLevel,
       };
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
-      console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); // Log AI output
+      console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); 
       isCorrect = evalOutput.isCorrect;
       explanationText = evalOutput.explanation || (isCorrect ? "Great job!" : "That's not quite right, let's look at why.");
       imgSuggestion = evalOutput.imageSuggestion;
@@ -219,8 +226,18 @@ export function KnowledgeQuizSession() {
     };
 
     if (isReviewMode) {
-        // For review mode, we might want to update the original history item or a separate review history
-        // For now, let's just update the display values and not persist changes to `incorrectlyAnsweredQuestions` during review
+        // Logic for handling answers during review mode
+        // For now, we update the item in incorrectlyAnsweredQuestions array if the answer changes or evaluation result changes.
+        // This is a simplified approach; a more robust system might update a separate review history.
+        const updatedReviewItems = [...incorrectlyAnsweredQuestions];
+        updatedReviewItems[currentReviewQuestionIndex] = {
+            ...updatedReviewItems[currentReviewQuestionIndex], // Keep original question
+            answer: data.answer, // User's new answer
+            isCorrect: isCorrect,
+            explanation: explanationText,
+            imageSuggestion: imgSuggestion
+        };
+        setIncorrectlyAnsweredQuestions(updatedReviewItems);
     } else {
         const updatedHistory = [...history, newHistoryItem];
         setHistory(updatedHistory);
@@ -242,11 +259,16 @@ export function KnowledgeQuizSession() {
         if (nextIndex < incorrectlyAnsweredQuestions.length) {
             setCurrentReviewQuestionIndex(nextIndex);
             setCurrentQuestionText(incorrectlyAnsweredQuestions[nextIndex].question);
+            // Clear previous answer from form for the new review question
+            answerForm.setValue('answer', incorrectlyAnsweredQuestions[nextIndex].answer || ''); 
             setCurrentStep('questioning');
         } else {
             // Review finished
             setIsReviewMode(false);
-            setCurrentStep('summary'); // Go back to summary view
+            // Optionally, update the main history with corrected answers from the review
+            // For now, just go back to the summary view.
+            // We might want to re-fetch summary if review changes things significantly.
+            fetchQuizSummary(topic, educationLevel, history); // Re-fetch summary to reflect reviewed answers
             toast({title: "Review Complete!", description: "You've reviewed all incorrect answers.", variant: "default"});
         }
     } else {
@@ -255,16 +277,21 @@ export function KnowledgeQuizSession() {
   };
 
   const handleStartReview = () => {
-    if (incorrectlyAnsweredQuestions.length > 0) {
+    const questionsToReview = history.filter(item => !item.isCorrect);
+    if (questionsToReview.length > 0) {
+        setIncorrectlyAnsweredQuestions(questionsToReview);
         setIsReviewMode(true);
         setCurrentReviewQuestionIndex(0);
-        setCurrentQuestionText(incorrectlyAnsweredQuestions[0].question);
+        setCurrentQuestionText(questionsToReview[0].question);
+        // Pre-fill with their last (incorrect) answer to allow editing
+        answerForm.setValue('answer', questionsToReview[0].answer || '');
         setCurrentExplanation(null);
         setCurrentImageSuggestion(null);
         setShowExplanationSection(false);
-        answerForm.reset();
         setCurrentStep('questioning');
         toast({title: "Review Mode", description: "Let's go over the questions you missed.", variant: "default"});
+    } else {
+        toast({title: "No Incorrect Answers", description: "Great job! Nothing to review.", variant: "default"});
     }
   };
 
@@ -502,7 +529,7 @@ export function KnowledgeQuizSession() {
           </CardContent>
           <CardFooter className="p-1 border-t bg-muted/50 flex justify-center">
             <Button variant="ghost" size="sm" onClick={handleRestartQuiz} className="text-muted-foreground hover:text-destructive" disabled={isLoading || isEvaluating}>
-              Cancel Quiz
+              <RefreshCw className="mr-1 h-4 w-4" /> Restart Quiz
             </Button>
           </CardFooter>
         </>
@@ -610,6 +637,15 @@ export function KnowledgeQuizSession() {
                     </CardContent>
                 </Card>
             )}
+             {incorrectlyAnsweredQuestions.length === 0 && history.length > 0 && !isReviewMode &&(
+                <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/40 shadow-sm rounded-md p-1 my-1">
+                    <ThumbsUp className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
+                    <AlertTitle className="font-semibold text-green-700 dark:text-green-300">All Correct!</AlertTitle>
+                    <AlertDescription className="text-green-700/90 dark:text-green-400/90">
+                        Congratulations! You answered all questions correctly.
+                    </AlertDescription>
+                </Alert>
+            )}
           </CardContent>
           <CardFooter className="p-1 border-t bg-muted/50 flex justify-center">
             <Button onClick={handleRestartQuiz} variant="outline" className="w-full sm:w-auto shadow-md">
@@ -621,6 +657,3 @@ export function KnowledgeQuizSession() {
     </Card>
   );
 }
-
-
-    
