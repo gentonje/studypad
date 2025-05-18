@@ -177,7 +177,7 @@ export function KnowledgeQuizSession() {
     if (!currentQuestionText) return;
     setIsEvaluating(true);
     setShowExplanationSection(false);
-    setCurrentExplanation(null); 
+    setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
 
     let isCorrect = false;
@@ -192,6 +192,7 @@ export function KnowledgeQuizSession() {
         educationLevel: educationLevel,
       };
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
+      console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); // Log AI output
       isCorrect = evalOutput.isCorrect;
       explanationText = evalOutput.explanation || (isCorrect ? "Great job!" : "That's not quite right, let's look at why.");
       imgSuggestion = evalOutput.imageSuggestion;
@@ -209,14 +210,14 @@ export function KnowledgeQuizSession() {
       setIsEvaluating(false);
     }
 
-    const newHistoryItem: HistoryItem = { 
-        question: currentQuestionText, 
-        answer: data.answer, 
-        isCorrect, 
+    const newHistoryItem: HistoryItem = {
+        question: currentQuestionText,
+        answer: data.answer,
+        isCorrect,
         explanation: explanationText,
         imageSuggestion: imgSuggestion
     };
-    
+
     if (isReviewMode) {
         // For review mode, we might want to update the original history item or a separate review history
         // For now, let's just update the display values and not persist changes to `incorrectlyAnsweredQuestions` during review
@@ -224,7 +225,7 @@ export function KnowledgeQuizSession() {
         const updatedHistory = [...history, newHistoryItem];
         setHistory(updatedHistory);
     }
-    
+
     setCurrentExplanation(explanationText);
     setCurrentImageSuggestion(imgSuggestion || null);
     setShowExplanationSection(true);
@@ -234,7 +235,7 @@ export function KnowledgeQuizSession() {
     setShowExplanationSection(false);
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
-    answerForm.reset(); 
+    answerForm.reset();
 
     if (isReviewMode) {
         const nextIndex = currentReviewQuestionIndex + 1;
@@ -249,7 +250,7 @@ export function KnowledgeQuizSession() {
             toast({title: "Review Complete!", description: "You've reviewed all incorrect answers.", variant: "default"});
         }
     } else {
-        fetchNextQuestion(topic, educationLevel, history); 
+        fetchNextQuestion(topic, educationLevel, history);
     }
   };
 
@@ -266,7 +267,7 @@ export function KnowledgeQuizSession() {
         toast({title: "Review Mode", description: "Let's go over the questions you missed.", variant: "default"});
     }
   };
-  
+
   const handleRestartQuiz = () => {
     setCurrentStep('config');
     setCurrentQuestionText(null);
@@ -296,7 +297,7 @@ export function KnowledgeQuizSession() {
     }
     return "Loading...";
   };
-  
+
   if ((isLoading || (isEvaluating && !showExplanationSection)) && currentStep !== 'questioning' && currentStep !== 'summary' && currentStep !== 'config' && currentStep !== 'error') {
     return (
       <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
@@ -395,12 +396,12 @@ export function KnowledgeQuizSession() {
                 {isReviewMode ? "Reviewing: " : "Topic: "}{topic}
              </CardTitle>
              <CardDescription className="text-center sm:text-left">
-                Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | 
+                Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} |
                 {isReviewMode ? ` Review Question ${currentReviewQuestionIndex + 1} of ${incorrectlyAnsweredQuestions.length}` : ` Question ${history.length + (showExplanationSection ? 0 : 1)}`}
              </CardDescription>
           </CardHeader>
-          
-          {history.length > 0 && !showExplanationSection && !isReviewMode && ( 
+
+          {history.length > 0 && !showExplanationSection && !isReviewMode && (
             <CardContent className="p-1 max-h-60 overflow-y-auto bg-muted/20">
               <h3 className="text-md font-semibold text-muted-foreground mb-1 sticky top-0 bg-card z-10 py-1 px-1">Previous Questions:</h3>
               <div className="space-y-1 pt-1">
@@ -415,7 +416,7 @@ export function KnowledgeQuizSession() {
                         item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <span className="ml-1 text-xl self-start">🤔</span>
                       )}
                     </div>
-                    <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap"> 
+                    <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap">
                       <span className="font-semibold">Your Answer: </span>{item.answer}
                     </p>
                   </div>
@@ -455,19 +456,19 @@ export function KnowledgeQuizSession() {
                     <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
                     <AlertDescription className="text-green-700/90 dark:text-green-400/90 whitespace-pre-wrap">
                       {currentExplanation}
-                    </AlertDescription>
-                    {currentImageSuggestion && (
+                      {currentImageSuggestion && console.log("KnowledgeQuizSession: Rendering image with suggestion:", currentImageSuggestion)}
+                      {currentImageSuggestion && (
                         <div className="mt-1 p-1 border-t border-green-200 dark:border-green-700/30">
                             <p className="text-xs text-green-600 dark:text-green-400/80 mb-1 italic">Suggested image for clarity:</p>
-                            <Image 
-                                src={`https://placehold.co/300x200.png`} 
-                                alt={currentImageSuggestion}
+                            <Image
+                                src={`https://placehold.co/300x200.png`}
+                                alt={currentImageSuggestion || "Visual aid"}
                                 width={300}
                                 height={200}
                                 className="rounded shadow-md border border-green-300 dark:border-green-600"
                                 data-ai-hint={currentImageSuggestion}
                             />
-                             <a 
+                             <a
                                 href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(currentImageSuggestion)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -477,6 +478,7 @@ export function KnowledgeQuizSession() {
                               </a>
                         </div>
                     )}
+                    </AlertDescription>
                   </Alert>
                 )}
 
@@ -539,15 +541,15 @@ export function KnowledgeQuizSession() {
                                     <p className="text-green-700/90 dark:text-green-400/90 whitespace-pre-wrap">{item.explanation}</p>
                                     {item.imageSuggestion && (
                                         <div className="mt-1 pt-1 border-t border-green-200 dark:border-green-700/30">
-                                             <Image 
-                                                src={`https://placehold.co/200x150.png`} 
-                                                alt={item.imageSuggestion}
+                                             <Image
+                                                src={`https://placehold.co/200x150.png`}
+                                                alt={item.imageSuggestion || "Visual aid for explanation"}
                                                 width={200}
                                                 height={150}
                                                 className="rounded shadow-sm border border-green-300 dark:border-green-600 my-1"
                                                 data-ai-hint={item.imageSuggestion}
                                             />
-                                            <a 
+                                            <a
                                               href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(item.imageSuggestion)}`}
                                               target="_blank"
                                               rel="noopener noreferrer"
@@ -619,3 +621,6 @@ export function KnowledgeQuizSession() {
     </Card>
   );
 }
+
+
+    
