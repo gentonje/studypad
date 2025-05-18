@@ -178,9 +178,9 @@ export function KnowledgeQuizSession() {
       explanationText = evalOutput.explanation || (isCorrect ? "Great job!" : "That's not quite right, let's look at why.");
 
       if (isCorrect) {
-        toast({ title: "Correct!", description: explanationText, variant: "default", duration: 3000 });
+        toast({ title: "Correct!", description: explanationText.substring(0, 100) + (explanationText.length > 100 ? "..." : ""), variant: "default", duration: 3000 });
       } else {
-        toast({ title: "Check Explanation", description: explanationText, variant: "default", duration: 3500 });
+        toast({ title: "Check Explanation", description: explanationText.substring(0,100) + (explanationText.length > 100 ? "..." : ""), variant: "default", duration: 3500 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
@@ -330,10 +330,9 @@ export function KnowledgeQuizSession() {
           </CardHeader>
           
           {history.length > 0 && !showExplanationSection && ( 
-            <CardContent className="p-3 sm:p-4 max-h-60">
-              <ScrollArea className="h-full pr-3">
-                <div className="space-y-4">
-                <h3 className="text-md font-semibold text-muted-foreground mb-2">Previous Questions:</h3>
+            <CardContent className="p-3 sm:p-4 max-h-60 overflow-y-auto"> {/* Modified: Made CardContent scrollable */}
+              <h3 className="text-md font-semibold text-muted-foreground mb-2 sticky top-0 bg-card z-10 py-1">Previous Questions:</h3> {/* Modified: Made h3 sticky */}
+              <div className="space-y-4 pt-1"> {/* Modified: Added padding top for sticky header */}
                 {history.map((item, index) => (
                   <div key={index} className="text-sm p-2 sm:p-3 rounded-md bg-muted/30 border border-border/70 shadow-sm">
                     <div className="flex items-start">
@@ -350,12 +349,10 @@ export function KnowledgeQuizSession() {
                     </p>
                   </div>
                 ))}
-                </div>
-              </ScrollArea>
+              </div>
             </CardContent>
           )}
 
-          {/* Ensure consistent padding for the current question section */}
           <CardContent className="p-4 sm:p-6">
             <Form {...answerForm}>
               <form onSubmit={answerForm.handleSubmit(handleAnswerSubmit)} className="space-y-6">
@@ -495,5 +492,4 @@ export function KnowledgeQuizSession() {
     </Card>
   );
 }
-
 
