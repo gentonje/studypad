@@ -3,6 +3,7 @@
 
 /**
  * @fileOverview An AI agent that summarizes a knowledge quiz and provides further learning suggestions.
+ * Considers an optional PDF document that might have been used for context.
  *
  * - getQuizSummary - A function that generates a summary of the quiz.
  * - QuizSummaryInput - The input type for the getQuizSummary function.
@@ -18,6 +19,7 @@ const QuizSummaryInputSchema = z.object({
   topic: z.string().describe('The topic of the quiz.'),
   educationLevel: EducationLevels.describe('The education level for which the quiz was taken.'),
   language: SupportedLanguages.optional().describe('The language for the summary and suggestions. Defaults to English.'),
+  pdfDataUri: z.string().optional().describe("A PDF document provided by the user, as a data URI. Expected format: 'data:application/pdf;base64,<encoded_data>'."),
   responses: z
     .record(z.string())
     .describe('A record of question IDs (or truncated questions) to user responses.'),
@@ -43,6 +45,11 @@ const prompt = ai.definePrompt({
   input: {schema: QuizSummaryInputSchema},
   output: {schema: QuizSummaryOutputSchema},
   prompt: `You are an AI assistant designed to summarize a user's performance on a knowledge quiz and provide suggestions for further learning, in their chosen language.
+{{#if pdfDataUri}}
+The quiz questions may have been based on the content of this document, which the user provided: {{media url=pdfDataUri}}.
+Please consider this document context if it seems relevant to the questions and answers when forming your summary and suggestions.
+{{/if}}
+
 The quiz was on the topic: {{{topic}}}
 The target education level was: {{{educationLevel}}}
 The desired language for this summary is: {{#if language}}{{language}}{{else}}English{{/if}}.

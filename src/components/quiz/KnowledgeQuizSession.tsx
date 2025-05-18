@@ -3,7 +3,7 @@
 
 import type { StaticImageData } from 'next/image';
 import Image from 'next/image';
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { z } from "zod";
@@ -19,10 +19,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check, ArrowRight, Image as ImageIcon, ExternalLink, ThumbsUp, Languages } from 'lucide-react';
+import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check, ArrowRight, Image as ImageIcon, ExternalLink, ThumbsUp, Languages, FileText, XCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+
+const readFileAsDataURI = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
 
 const configFormSchema = z.object({
   topic: z.string().min(3, { message: "Topic must be at least 3 characters." }).max(100, {message: "Topic is too long."}),
@@ -54,9 +63,15 @@ export function KnowledgeQuizSession() {
   const [summaryText, setSummaryText] = useState<string | null>(null);
   const [furtherLearningSuggestions, setFurtherLearningSuggestions] = useState<string[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Configuration state
   const [topic, setTopic] = useState<string>("");
   const [educationLevel, setEducationLevel] = useState<EducationLevel>("HighSchool");
   const [language, setLanguage] = useState<SupportedLanguage>("English");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [configPdfDataUri, setConfigPdfDataUri] = useState<string | null>(null);
+
+
   const [isLoading, setIsLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [currentExplanation, setCurrentExplanation] = useState<string | null>(null);
@@ -82,22 +97,44 @@ export function KnowledgeQuizSession() {
     },
   });
 
-  const fetchInitialQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage) => {
+  // Effect to log educationLevel from form state when it changes
+  useEffect(() => {
+    const subscription = configForm.watch((value, { name, type }) => {
+      if (name === 'educationLevel') {
+        // console.log('[EducationLevel Form Watch] New educationLevel:', value.educationLevel);
+        // You could also directly setEducationLevel(value.educationLevel as EducationLevel) here
+        // if you want the separate educationLevel state to always mirror the form's state.
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [configForm.watch]);
+
+
+  const fetchInitialQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, currentPdfDataUri: string | null) => {
     setIsLoading(true);
     setCurrentStep('loading');
-    setErrorMessage(null);
+    // setErrorMessage should be set before calling, if needed for PDF processing, or cleared here
+    if (!errorMessage?.startsWith("Processing PDF...")) { // Don't clear PDF processing message
+        setErrorMessage(null);
+    }
     setShowExplanationSection(false);
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
     try {
-      const input: KnowledgeQuizInput = { previousAnswers: [], topic: currentTopic, educationLevel: currentEducationLevel, language: currentLanguage };
+      const input: KnowledgeQuizInput = { 
+        previousAnswers: [], 
+        topic: currentTopic, 
+        educationLevel: currentEducationLevel, 
+        language: currentLanguage,
+        pdfDataUri: currentPdfDataUri 
+      };
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
-        setErrorMessage("Could not generate the first question for this topic/level/language. Please try another combination.");
-        fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, []);
+        setErrorMessage("Could not generate the first question for this topic/level/language/PDF. Please try another combination.");
+        fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, [], currentPdfDataUri);
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching initial question:", error);
@@ -109,18 +146,42 @@ export function KnowledgeQuizSession() {
     }
   };
 
-  const handleConfigSubmit: SubmitHandler<ConfigFormData> = (data) => {
+  const handleConfigSubmit: SubmitHandler<ConfigFormData> = async (data) => {
     setTopic(data.topic);
-    setEducationLevel(data.educationLevel);
-    setLanguage(data.language);
+    setEducationLevel(data.educationLevel); // This state is mainly for display in headers now
+    setLanguage(data.language); // This state is also for display/passing if not directly from form
     setHistory([]);
     setIncorrectlyAnsweredQuestions([]);
     setIsReviewMode(false);
     setCurrentReviewQuestionIndex(0);
-    fetchInitialQuestion(data.topic, data.educationLevel, data.language);
+    
+    let generatedPdfDataUri: string | null = null;
+    if (pdfFile) {
+      setIsLoading(true); 
+      setCurrentStep('loading');
+      setErrorMessage("Processing PDF..."); 
+      try {
+        generatedPdfDataUri = await readFileAsDataURI(pdfFile);
+        setConfigPdfDataUri(generatedPdfDataUri); // Store for later use in other flows
+        // setErrorMessage(null); // Cleared by fetchInitialQuestion or if it sets its own error
+        toast({ title: "PDF Processed", description: `${pdfFile.name} will be used for context.`, variant: "default" });
+      } catch (error) {
+        console.error("Error reading PDF file:", error);
+        toast({ title: "PDF Error", description: "Could not read PDF file. Continuing without it.", variant: "destructive" });
+        setErrorMessage("Could not process the PDF. Continuing without it.");
+        setConfigPdfDataUri(null); 
+        setPdfFile(null); 
+      }
+      // setIsLoading(false) will be handled by fetchInitialQuestion's finally block
+    } else {
+        setConfigPdfDataUri(null); // Ensure it's null if no file was selected or if cleared
+    }
+    // Pass the freshly generated (or null) URI and form data to fetchInitialQuestion
+    // The form data (data.topic, data.educationLevel, data.language) is the source of truth for the quiz config
+    fetchInitialQuestion(data.topic, data.educationLevel, data.language, generatedPdfDataUri);
   };
 
-  const fetchNextQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, updatedHistory: HistoryItem[]) => {
+  const fetchNextQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, updatedHistory: HistoryItem[], currentPdfDataUri: string | null) => {
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null);
@@ -130,9 +191,10 @@ export function KnowledgeQuizSession() {
     try {
       const input: KnowledgeQuizInput = { 
         previousAnswers: updatedHistory.map(h => ({question: h.question, answer: h.answer})), 
-        topic: currentTopic, 
-        educationLevel: currentEducationLevel,
-        language: currentLanguage,
+        topic: currentTopic,  // Use topic from form submit
+        educationLevel: currentEducationLevel, // Use educationLevel from form submit
+        language: currentLanguage, // Use language from form submit
+        pdfDataUri: currentPdfDataUri, 
       };
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
 
@@ -141,7 +203,7 @@ export function KnowledgeQuizSession() {
         setCurrentStep('questioning');
       } else {
         setIncorrectlyAnsweredQuestions(updatedHistory.filter(item => !item.isCorrect));
-        fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, updatedHistory);
+        fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, updatedHistory, currentPdfDataUri); 
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching next question:", error);
@@ -153,7 +215,7 @@ export function KnowledgeQuizSession() {
     }
   };
 
-  const fetchQuizSummary = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, finalHistory: HistoryItem[]) => {
+  const fetchQuizSummary = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, finalHistory: HistoryItem[], currentPdfDataUri: string | null) => {
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null);
@@ -167,9 +229,10 @@ export function KnowledgeQuizSession() {
       }, {} as Record<string, string>);
 
       const input: QuizSummaryInput = { 
-        topic: currentTopic, 
-        educationLevel: currentEducationLevel, 
-        language: currentLanguage,
+        topic: currentTopic, // Use topic from form submit
+        educationLevel: currentEducationLevel, // Use educationLevel from form submit
+        language: currentLanguage, // Use language from form submit
+        pdfDataUri: currentPdfDataUri, 
         responses, 
         conversationHistory: finalHistory.map(h => ({question: h.question, answer: h.answer})) 
       };
@@ -195,26 +258,31 @@ export function KnowledgeQuizSession() {
     setShowExplanationSection(false);
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
+    // console.log("KnowledgeQuizSession: handleAnswerSubmit called for question:", currentQuestionText, "Answer:", data.answer);
 
-    let isCorrect = false;
+    let isCorrectUserAnswer = false; 
     let explanationText = "Could not retrieve explanation for this answer.";
     let imgSuggestion: string | undefined = undefined;
 
     try {
+      // Values from configForm are the source of truth for topic, educationLevel, language
+      const formConfig = configForm.getValues(); 
       const evalInput: EvaluateAnswerInput = {
         question: currentQuestionText,
         userAnswer: data.answer,
-        topic: topic,
-        educationLevel: educationLevel,
-        language: language,
+        topic: formConfig.topic,
+        educationLevel: formConfig.educationLevel,
+        language: formConfig.language,
+        pdfDataUri: configPdfDataUri, 
       };
+      // console.log("KnowledgeQuizSession: AI Evaluation Input:", evalInput);
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
-      console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); 
-      isCorrect = evalOutput.isCorrect;
-      explanationText = evalOutput.explanation || (isCorrect ? "Great job!" : "That's not quite right, let's look at why.");
+      // console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); 
+      isCorrectUserAnswer = evalOutput.isCorrect;
+      explanationText = evalOutput.explanation || (isCorrectUserAnswer ? "Great job!" : "That's not quite right, let's look at why.");
       imgSuggestion = evalOutput.imageSuggestion;
 
-      if (isCorrect) {
+      if (isCorrectUserAnswer) {
         toast({ icon: <ThumbsUp className="text-green-500" />, title: "Correct! 🎉", description: explanationText ? "See explanation below." : "Well done!", variant: "default", duration: 3000 });
       } else {
         toast({ icon: <span className="text-xl">🤔</span>, title: "Let's review", description: explanationText ? "See explanation below." : "Take a look at the explanation.", variant: "default", duration: 3500 });
@@ -230,7 +298,7 @@ export function KnowledgeQuizSession() {
     const newHistoryItem: HistoryItem = {
         question: currentQuestionText,
         answer: data.answer,
-        isCorrect,
+        isCorrect: isCorrectUserAnswer,
         explanation: explanationText,
         imageSuggestion: imgSuggestion
     };
@@ -240,7 +308,7 @@ export function KnowledgeQuizSession() {
         updatedReviewItems[currentReviewQuestionIndex] = {
             ...updatedReviewItems[currentReviewQuestionIndex],
             answer: data.answer, 
-            isCorrect: isCorrect, 
+            isCorrect: isCorrectUserAnswer, 
             explanation: explanationText, 
             imageSuggestion: imgSuggestion 
         };
@@ -266,6 +334,8 @@ export function KnowledgeQuizSession() {
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
     answerForm.reset(); 
+    
+    const formConfig = configForm.getValues(); // Get latest config from form
 
     if (isReviewMode) {
         const nextIndex = currentReviewQuestionIndex + 1;
@@ -276,11 +346,11 @@ export function KnowledgeQuizSession() {
             setCurrentStep('questioning');
         } else {
             setIsReviewMode(false);
-            fetchQuizSummary(topic, educationLevel, language, history); 
+            fetchQuizSummary(formConfig.topic, formConfig.educationLevel, formConfig.language, history, configPdfDataUri); 
             toast({title: "Review Complete!", description: "You've reviewed all incorrect answers.", variant: "default"});
         }
     } else {
-        fetchNextQuestion(topic, educationLevel, language, history);
+        fetchNextQuestion(formConfig.topic, formConfig.educationLevel, formConfig.language, history, configPdfDataUri); 
     }
   };
 
@@ -309,12 +379,16 @@ export function KnowledgeQuizSession() {
     setSummaryText(null);
     setFurtherLearningSuggestions(null);
     setErrorMessage(null);
-    setTopic("");
-    setLanguage("English");
+    // setTopic(""); // No longer needed, configForm handles this
+    // setEducationLevel("HighSchool"); // No longer needed
+    // setLanguage("English"); // No longer needed
+    
+    setPdfFile(null);
+    setConfigPdfDataUri(null);
     setIncorrectlyAnsweredQuestions([]);
     setIsReviewMode(false);
     setCurrentReviewQuestionIndex(0);
-    configForm.reset({ topic: "", educationLevel: "HighSchool", language: "English" });
+    configForm.reset(); // Resets to defaultValues specified in useForm
     answerForm.reset();
     setIsLoading(false);
     setIsEvaluating(false);
@@ -322,8 +396,19 @@ export function KnowledgeQuizSession() {
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
   };
+  
+  const handleClearPdf = () => {
+    setPdfFile(null);
+    setConfigPdfDataUri(null); 
+    const fileInput = document.getElementById('pdf-upload-input') as HTMLInputElement | null;
+    if (fileInput) {
+        fileInput.value = ""; // Attempt to clear the native file input
+    }
+    toast({ title: "PDF Cleared", description: "The selected PDF has been removed.", variant: "default" });
+  };
 
   const getLoadingMessage = () => {
+    if (errorMessage && errorMessage.startsWith("Processing PDF...")) return errorMessage;
     if (isEvaluating && !showExplanationSection) return "Evaluating your answer...";
     if (currentStep === 'loading') {
         if (!currentQuestionText && !summaryText && history.length === 0 && !isReviewMode) return "Preparing your quiz...";
@@ -332,6 +417,9 @@ export function KnowledgeQuizSession() {
     }
     return "Loading...";
   };
+
+  const formValuesForHeader = configForm.watch();
+
 
   if ((isLoading || (isEvaluating && !showExplanationSection)) && currentStep !== 'questioning' && currentStep !== 'summary' && currentStep !== 'config' && currentStep !== 'error') {
     return (
@@ -393,29 +481,35 @@ export function KnowledgeQuizSession() {
                 <FormField
                   control={configForm.control}
                   name="educationLevel"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-lg">Education Level</FormLabel>
-                      <Select
-                        onValueChange={(value) => field.onChange(value as EducationLevel)}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
-                            <SelectValue placeholder="Select education level" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {EducationLevels.options.map((level) => (
-                            <SelectItem key={level} value={level} className="text-base">
-                              {level.replace(/([A-Z])/g, ' $1').trim()}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    // console.log('[EducationLevel Field Render] field.value:', field.value);
+                    return (
+                      <FormItem>
+                        <FormLabel className="text-lg">Education Level</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            // console.log('[EducationLevel Select onValueChange] selected value:', value);
+                            field.onChange(value as EducationLevel);
+                          }}
+                          value={field.value} // Use value for controlled component
+                        >
+                          <FormControl>
+                            <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
+                              <SelectValue placeholder="Select education level" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {EducationLevels.options.map((level) => (
+                              <SelectItem key={level} value={level} className="text-base">
+                                {level.replace(/([A-Z])/g, ' $1').trim()}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
                 <FormField
                   control={configForm.control}
@@ -444,6 +538,29 @@ export function KnowledgeQuizSession() {
                     </FormItem>
                   )}
                 />
+                 <FormItem>
+                  <FormLabel className="text-lg">Optional PDF for Context</FormLabel>
+                  <div className="flex items-center space-x-1">
+                    <FormControl className="flex-grow">
+                      <Input
+                        id="pdf-upload-input"
+                        type="file"
+                        accept="application/pdf"
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => setPdfFile(e.target.files?.[0] || null)}
+                        className="text-base shadow-sm focus:ring-2 focus:ring-primary file:mr-1 file:py-1 file:px-1 file:rounded-full file:border-0 file:text-xs file:bg-muted file:text-muted-foreground hover:file:bg-primary/10"
+                        aria-describedby="pdf-description"
+                      />
+                    </FormControl>
+                    {pdfFile && (
+                      <Button type="button" variant="ghost" size="icon" onClick={handleClearPdf} aria-label="Clear selected PDF">
+                        <XCircle className="h-5 w-5 text-muted-foreground hover:text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                  {pdfFile && <FormDescription id="pdf-description">Selected: {pdfFile.name}</FormDescription>}
+                  {!pdfFile && <FormDescription id="pdf-description">Upload a PDF to base the quiz on its content.</FormDescription>}
+                  <FormMessage />
+                </FormItem>
                 <Button type="submit" size="lg" className="w-full shadow-md" disabled={isLoading || isEvaluating}>
                   {isLoading || isEvaluating ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-1 h-5 w-5" />}
                   Start Quiz
@@ -458,15 +575,15 @@ export function KnowledgeQuizSession() {
         <>
           <CardHeader className="bg-muted/50 p-1 border-b">
              <CardTitle className="text-xl text-center sm:text-left text-primary">
-                {isReviewMode ? "Reviewing: " : "Topic: "}{topic}
+                {isReviewMode ? "Reviewing: " : "Topic: "}{formValuesForHeader.topic} {configPdfDataUri && <FileText className="inline h-5 w-5 ml-1 align-middle" title="PDF Context Active"/>}
              </CardTitle>
              <CardDescription className="text-center sm:text-left">
-                Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {language} |
+                Level: {formValuesForHeader.educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {formValuesForHeader.language} |
                 {isReviewMode ? ` Review Question ${currentReviewQuestionIndex + 1} of ${incorrectlyAnsweredQuestions.length}` : ` Question ${history.length + (showExplanationSection ? 0 : 1)}`}
              </CardDescription>
           </CardHeader>
 
-          {history.length > 0 && !showExplanationSection && !isReviewMode && (
+           {history.length > 0 && !showExplanationSection && !isReviewMode && (
             <CardContent className="p-1 max-h-60 overflow-y-auto bg-muted/20">
               <h3 className="text-md font-semibold text-muted-foreground mb-1 sticky top-0 bg-card z-10 py-1 px-1">Previous Questions:</h3>
               <div className="space-y-1 pt-1">
@@ -477,11 +594,11 @@ export function KnowledgeQuizSession() {
                       <div className="flex-1">
                         <span className="font-medium text-card-foreground whitespace-pre-wrap">{item.question}</span>
                       </div>
-                      {typeof item.isCorrect === 'boolean' ? (
+                       {typeof item.isCorrect === 'boolean' ? (
                         item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <span className="ml-1 text-xl self-start">🤔</span>
                       ) : <span className="ml-1 text-xl self-start">🤔</span>}
                     </div>
-                    <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap prose prose-p:my-1">
+                    <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap prose prose-sm prose-p:my-1">
                       <span className="font-semibold">Your Answer: </span>{item.answer}
                     </p>
                   </div>
@@ -521,7 +638,7 @@ export function KnowledgeQuizSession() {
                     <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
                     <AlertDescription className="text-green-700/90 dark:text-green-400/90">
                         <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1">
-                            {currentExplanation}
+                            <ReactMarkdown>{currentExplanation}</ReactMarkdown>
                         </div>
                       {currentImageSuggestion && (
                         <div className="mt-1 p-1 border-t border-green-200 dark:border-green-700/30">
@@ -581,7 +698,7 @@ export function KnowledgeQuizSession() {
                 <CheckCircle2 className="w-10 h-10 text-accent mr-1" />
                 <CardTitle className="text-2xl">Quiz Summary</CardTitle>
             </div>
-            <CardDescription>Topic: {topic} | Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {language}</CardDescription>
+            <CardDescription>Topic: {formValuesForHeader.topic} {configPdfDataUri && <FileText className="inline h-4 w-4 ml-1 align-middle" title="PDF Context Active"/>} | Level: {formValuesForHeader.educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {formValuesForHeader.language}</CardDescription>
           </CardHeader>
           <CardContent className="p-1 space-y-1">
             {history.length > 0 && (
@@ -605,7 +722,7 @@ export function KnowledgeQuizSession() {
                                   <div className="mt-1 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
                                     <p className="font-semibold text-green-700 dark:text-green-300">Explanation:</p>
                                     <div className="text-green-700/90 dark:text-green-400/90 prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1">
-                                        {item.explanation}
+                                        <ReactMarkdown>{item.explanation}</ReactMarkdown>
                                     </div>
                                     {item.imageSuggestion && (
                                         <div className="mt-1 pt-1 border-t border-green-200 dark:border-green-700/30">
@@ -643,7 +760,7 @@ export function KnowledgeQuizSession() {
                 </CardHeader>
                 <CardContent className="p-1">
                     <div className="text-card-foreground whitespace-pre-wrap prose dark:prose-invert max-w-none prose-p:my-1">
-                        {summaryText}
+                        <ReactMarkdown>{summaryText}</ReactMarkdown>
                     </div>
                 </CardContent>
                 </Card>
@@ -700,3 +817,4 @@ export function KnowledgeQuizSession() {
     </Card>
   );
 }
+

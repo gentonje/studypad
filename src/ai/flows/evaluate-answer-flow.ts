@@ -2,7 +2,7 @@
 'use server';
 /**
  * @fileOverview An AI agent that evaluates a user's answer to a quiz question,
- * providing detailed explanations and suggesting images for clarity.
+ * providing detailed explanations and suggesting images for clarity. Considers an optional PDF for context.
  *
  * - evaluateAnswer - A function that handles the answer evaluation.
  * - EvaluateAnswerInput - The input type for the evaluateAnswer function.
@@ -19,6 +19,7 @@ const EvaluateAnswerInputSchema = z.object({
   topic: z.string().describe('The general topic of the quiz.'),
   educationLevel: EducationLevels.describe('The target education level for the quiz.'),
   language: SupportedLanguages.optional().describe('The language for the explanation. Defaults to English.'),
+  pdfDataUri: z.string().optional().describe("A PDF document provided by the user, as a data URI. Expected format: 'data:application/pdf;base64,<encoded_data>'."),
 });
 export type EvaluateAnswerInput = z.infer<typeof EvaluateAnswerInputSchema>;
 
@@ -38,6 +39,9 @@ const evaluateAnswerPrompt = ai.definePrompt({
   input: {schema: EvaluateAnswerInputSchema},
   output: {schema: EvaluateAnswerOutputSchema},
   prompt: `You are an expert AI educator evaluating a student's answer to a quiz question. Your goal is not just to mark it right or wrong, but to help the student truly understand the concept in their chosen language.
+{{#if pdfDataUri}}
+The student may have been referring to the following document for context. If the question or answer relates to it, ensure your evaluation and explanation are consistent with this document: {{media url=pdfDataUri}}.
+{{/if}}
 
 Topic: {{{topic}}}
 Education Level: {{{educationLevel}}}
@@ -47,7 +51,7 @@ Question (this question was presented to the user in {{#if language}}{{language}
 User's Answer: {{{userAnswer}}}
 
 Please provide your response in {{#if language}}{{language}}{{else}}English{{/if}}.
-1.  \`isCorrect\`: A boolean indicating if the user's answer is substantially correct for the given question, topic, and education level. Be reasonably flexible with phrasing if the core concept is correct. If the answer is too vague, or clearly wrong, mark it as incorrect.
+1.  \`isCorrect\`: A boolean indicating if the user's answer is substantially correct for the given question, topic, education level{{#if pdfDataUri}}, and the provided document context{{/if}}. Be reasonably flexible with phrasing if the core concept is correct. If the answer is too vague, or clearly wrong, mark it as incorrect.
 2.  \`explanation\`: A detailed, teacher-like explanation.
     *   If correct: Explain *why* it's correct in {{#if language}}{{language}}{{else}}English{{/if}}, perhaps reinforcing the key concepts or adding a bit more relevant detail.
     *   If incorrect: Clearly explain the misunderstanding or error in {{#if language}}{{language}}{{else}}English{{/if}}. Provide the correct information and explain the reasoning behind it.
