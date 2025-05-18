@@ -22,7 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check, ArrowRight, Image as ImageIcon, ExternalLink, ThumbsUp, Languages, FileText, XCircle } from 'lucide-react';
+import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check, ArrowRight, Image as ImageIcon, ExternalLink, ThumbsUp, Languages, FileText, XCircle, Home } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const readFileAsDataURI = (file: File): Promise<string> => {
@@ -54,7 +54,11 @@ interface HistoryItem {
   imageSuggestion?: string;
 }
 
-export function KnowledgeQuizSession() {
+interface KnowledgeQuizSessionProps {
+  onGoToHome?: () => void;
+}
+
+export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) {
   const [currentStep, setCurrentStep] = useState<'config' | 'questioning' | 'summary' | 'loading' | 'error'>('config');
   const [currentQuestionText, setCurrentQuestionText] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -116,7 +120,6 @@ export function KnowledgeQuizSession() {
         language: currentLanguage,
         pdfDataUri: currentPdfDataUri 
       };
-      // console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow (initial):", input);
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
@@ -137,7 +140,7 @@ export function KnowledgeQuizSession() {
   };
 
   const handleConfigSubmit: SubmitHandler<ConfigFormData> = async (data) => {
-    // console.log("KnowledgeQuizSession: Config form submitted with data:", data);
+    console.log("KnowledgeQuizSession: Config form submitted with data:", data);
     setTopic(data.topic); 
     setEducationLevel(data.educationLevel); 
     setLanguage(data.language); 
@@ -153,7 +156,6 @@ export function KnowledgeQuizSession() {
       setCurrentStep('loading');
       setErrorMessage("Processing PDF..."); 
       try {
-        // console.log("KnowledgeQuizSession: Reading PDF file:", pdfFile.name);
         generatedPdfDataUri = await readFileAsDataURI(pdfFile);
         setConfigPdfDataUri(generatedPdfDataUri); 
         toast({ title: "PDF Processed", description: `${pdfFile.name} will be used for context.`, variant: "default" });
@@ -189,7 +191,6 @@ export function KnowledgeQuizSession() {
         language: currentLanguage,
         pdfDataUri: currentPdfDataUri, 
       };
-      // console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow (next):", input);
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
 
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
@@ -232,7 +233,6 @@ export function KnowledgeQuizSession() {
         responses, 
         conversationHistory: finalHistory 
       };
-      // console.log("KnowledgeQuizSession: Input to getQuizSummary:", input);
       const output: QuizSummaryOutput = await getQuizSummary(input);
       setSummaryText(output.summary);
       setFurtherLearningSuggestions(output.furtherLearningSuggestions);
@@ -259,7 +259,7 @@ export function KnowledgeQuizSession() {
     setErrorMessage(null);
     
     const formConfig = configForm.getValues(); 
-    console.log("KnowledgeQuizSession: Handling answer submit for question:", currentQuestionText, "Answer:", data.answer, "Config:", formConfig);
+    console.log("KnowledgeQuizSession: Handling answer submit for question:", currentQuestionText, "Answer:", data.answer, "Config:", formConfig, "PDF present:", !!configPdfDataUri);
 
     let isCorrectUserAnswer = false; 
     let explanationText = "Could not retrieve explanation for this answer.";
@@ -274,14 +274,12 @@ export function KnowledgeQuizSession() {
         language: formConfig.language,
         pdfDataUri: configPdfDataUri, 
       };
-      // console.log("KnowledgeQuizSession: Input to evaluateAnswer:", evalInput);
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
-      // console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); 
+      console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); 
       
       isCorrectUserAnswer = evalOutput.isCorrect;
       explanationText = evalOutput.explanation || (isCorrectUserAnswer ? "Great job!" : "That's not quite right, let's look at why.");
       imgSuggestion = evalOutput.imageSuggestion;
-      // console.log("KnowledgeQuizSession: Image suggestion from AI:", imgSuggestion);
 
       if (isCorrectUserAnswer) {
         toast({ icon: <ThumbsUp className="text-green-500 mr-1" />, title: "Correct! 🎉", description: "See explanation below.", variant: "default", duration: 3000 });
@@ -379,28 +377,33 @@ export function KnowledgeQuizSession() {
   };
 
   const handleRestartQuiz = () => {
-    setCurrentStep('config');
-    setCurrentQuestionText(null);
-    setHistory([]);
-    setSummaryText(null);
-    setFurtherLearningSuggestions(null);
-    setErrorMessage(null);
-        
-    setPdfFile(null);
-    setConfigPdfDataUri(null);
-    const fileInput = document.getElementById('pdf-upload-input') as HTMLInputElement | null;
-    if (fileInput) fileInput.value = "";
+    if (onGoToHome) {
+      onGoToHome();
+    } else {
+      // Fallback if onGoToHome is not provided (e.g. direct navigation to quiz page)
+      setCurrentStep('config');
+      setCurrentQuestionText(null);
+      setHistory([]);
+      setSummaryText(null);
+      setFurtherLearningSuggestions(null);
+      setErrorMessage(null);
+          
+      setPdfFile(null);
+      setConfigPdfDataUri(null);
+      const fileInput = document.getElementById('pdf-upload-input') as HTMLInputElement | null;
+      if (fileInput) fileInput.value = "";
 
-    setIncorrectlyAnsweredQuestions([]);
-    setIsReviewMode(false);
-    setCurrentReviewQuestionIndex(0);
-    configForm.reset(); 
-    answerForm.reset();
-    setIsLoading(false);
-    setIsEvaluating(false);
-    setShowExplanationSection(false);
-    setCurrentExplanation(null);
-    setCurrentImageSuggestion(null);
+      setIncorrectlyAnsweredQuestions([]);
+      setIsReviewMode(false);
+      setCurrentReviewQuestionIndex(0);
+      configForm.reset(); 
+      answerForm.reset();
+      setIsLoading(false);
+      setIsEvaluating(false);
+      setShowExplanationSection(false);
+      setCurrentExplanation(null);
+      setCurrentImageSuggestion(null);
+    }
   };
   
   const handleClearPdf = () => {
@@ -456,8 +459,9 @@ export function KnowledgeQuizSession() {
           </Alert>
         </CardContent>
         <CardFooter className="p-1 border-t bg-muted/50 flex justify-center">
-            <Button onClick={handleRestartQuiz} variant="outline" className="w-full sm:w-auto">
-              <RefreshCw className="mr-1 h-4 w-4" /> Restart Quiz
+             <Button onClick={handleRestartQuiz} variant="outline" className="w-full sm:w-auto">
+              {onGoToHome ? <Home className="mr-1 h-4 w-4" /> : <RefreshCw className="mr-1 h-4 w-4" />}
+              {onGoToHome ? 'Go to Home' : 'Restart Quiz'}
             </Button>
         </CardFooter>
       </Card>
@@ -498,13 +502,12 @@ export function KnowledgeQuizSession() {
                   control={configForm.control}
                   name="educationLevel"
                   render={({ field }) => {
-                    // console.log("[EducationLevel Field Render] field.value:", field.value);
                     return (
                       <FormItem>
                         <FormLabel className="text-lg">Education Level</FormLabel>
                         <Select
                           onValueChange={(value) => {
-                            // console.log("[EducationLevel Select onValueChange] selected value:", value);
+                            console.log("[EducationLevel Select onValueChange] selected value:", value);
                             field.onChange(value as EducationLevel);
                           }}
                           value={field.value}
@@ -584,6 +587,13 @@ export function KnowledgeQuizSession() {
               </form>
             </Form>
           </CardContent>
+           <CardFooter className="p-1 border-t bg-muted/50 flex justify-center">
+            {onGoToHome && (
+              <Button variant="ghost" size="sm" onClick={onGoToHome} className="text-muted-foreground hover:text-primary">
+                <Home className="mr-1 h-4 w-4" /> Go to Home
+              </Button>
+            )}
+          </CardFooter>
         </>
       )}
 
@@ -636,8 +646,8 @@ export function KnowledgeQuizSession() {
                         <span className="font-medium text-card-foreground whitespace-pre-wrap">{item.question}</span>
                       </div>
                        {typeof item.isCorrect === 'boolean' ? (
-                        item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <span className="ml-1 text-xl self-start">🤔</span>
-                      ) : <span className="ml-1 text-xl self-start">🤔</span>}
+                        item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <XCircle className="ml-1 text-destructive w-4 h-4 self-start" />
+                      ) : <MessageCircle className="ml-1 text-muted-foreground w-4 h-4 self-start" /> }
                     </div>
                     <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap prose prose-p:my-1">
                       <span className="font-semibold">Your Answer: </span>{item.answer}
@@ -684,7 +694,6 @@ export function KnowledgeQuizSession() {
                       {currentImageSuggestion && (
                         <div className="mt-1 p-1 border-t border-green-200 dark:border-green-700/30">
                             <p className="text-xs text-green-600 dark:text-green-400/80 mb-1 italic">Suggested image for clarity:</p>
-                            {/* console.log("Rendering image with suggestion:", currentImageSuggestion); */}
                             <Image
                                 src={`https://placehold.co/300x200.png`}
                                 alt={currentImageSuggestion || "Visual aid for explanation"}
@@ -726,8 +735,9 @@ export function KnowledgeQuizSession() {
             </Form>
           </CardContent>
           <CardFooter className="p-1 border-t bg-muted/50 flex justify-center">
-            <Button variant="ghost" size="sm" onClick={handleRestartQuiz} className="text-muted-foreground hover:text-destructive" disabled={isLoading || isEvaluating}>
-              <RefreshCw className="mr-1 h-4 w-4" /> Restart Quiz
+             <Button variant="ghost" size="sm" onClick={handleRestartQuiz} className="text-muted-foreground hover:text-destructive" disabled={isLoading || isEvaluating}>
+              {onGoToHome ? <Home className="mr-1 h-4 w-4" /> : <RefreshCw className="mr-1 h-4 w-4" />}
+              {onGoToHome ? 'Go to Home' : 'Restart Quiz'}
             </Button>
           </CardFooter>
         </>
@@ -783,8 +793,8 @@ export function KnowledgeQuizSession() {
                                 <div className="font-medium text-card-foreground flex items-start space-x-1">
                                     <span className="mr-1 flex-1 whitespace-pre-wrap">{index+1}. {item.question}</span>
                                     {typeof item.isCorrect === 'boolean' ? (
-                                      item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <span className="ml-1 text-xl self-start">🤔</span>
-                                    ) : <span className="ml-1 text-xl self-start">🤔</span> }
+                                      item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <XCircle className="ml-1 text-destructive w-4 h-4 self-start" />
+                                    ) : <MessageCircle className="ml-1 text-muted-foreground w-4 h-4 self-start" /> }
                                 </div>
                                 <p className="text-xs text-muted-foreground pl-1 mt-1 whitespace-pre-wrap prose prose-p:my-1"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
                                 {item.explanation && (
@@ -877,8 +887,9 @@ export function KnowledgeQuizSession() {
             )}
           </CardContent>
           <CardFooter className="p-1 border-t bg-muted/50 flex justify-center">
-            <Button onClick={handleRestartQuiz} variant="outline" className="w-full sm:w-auto shadow-md">
-                <RefreshCw className="mr-1 h-4 w-4" /> Start New Quiz
+             <Button onClick={handleRestartQuiz} variant="outline" className="w-full sm:w-auto shadow-md">
+                {onGoToHome ? <Home className="mr-1 h-4 w-4" /> : <RefreshCw className="mr-1 h-4 w-4" />}
+                {onGoToHome ? 'Go to Home' : 'Restart New Quiz'}
             </Button>
           </CardFooter>
         </>
