@@ -43,7 +43,7 @@ Topic: {{{topic}}}
 Education Level: {{{educationLevel}}}
 Language for explanation: {{#if language}}{{language}}{{else}}English{{/if}}.
 
-Question (in {{#if language}}{{language_preference question_language else="original"}}{{else}}English{{/if}}): {{{question}}}
+Question (this question was presented to the user in {{#if language}}{{language}}{{else}}English{{/if}}): {{{question}}}
 User's Answer: {{{userAnswer}}}
 
 Please provide your response in {{#if language}}{{language}}{{else}}English{{/if}}.
