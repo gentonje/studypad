@@ -233,9 +233,9 @@ export function KnowledgeQuizSession() {
   
   if ((isLoading || (isEvaluating && !showExplanationSection)) && currentStep !== 'questioning' && currentStep !== 'summary' && currentStep !== 'config' && currentStep !== 'error') {
     return (
-      <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
-        <CardContent className="p-4 sm:p-6 min-h-[300px] flex flex-col items-center justify-center text-center">
-          <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+      <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card m-1">
+        <CardContent className="p-1 min-h-[300px] flex flex-col items-center justify-center text-center">
+          <Loader2 className="w-12 h-12 text-primary animate-spin mb-1" />
           <p className="text-lg text-muted-foreground">{getLoadingMessage()}</p>
         </CardContent>
       </Card>
@@ -244,14 +244,14 @@ export function KnowledgeQuizSession() {
 
   if (currentStep === 'error') {
     return (
-      <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
-        <CardContent className="p-4 sm:p-6 min-h-[300px] flex flex-col items-center justify-center">
+      <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card m-1">
+        <CardContent className="p-1 min-h-[300px] flex flex-col items-center justify-center">
           <Alert variant="destructive" className="max-w-md mx-auto">
             <AlertTriangle className="h-5 w-5" />
             <AlertTitle>An Error Occurred</AlertTitle>
             <AlertDescription>{errorMessage || "Something went wrong. Please try again."}</AlertDescription>
-            <Button onClick={handleRestartQuiz} variant="outline" className="mt-4 w-full sm:w-auto">
-              <RefreshCw className="mr-2 h-4 w-4" /> Restart Quiz
+            <Button onClick={handleRestartQuiz} variant="outline" className="mt-1 w-full sm:w-auto">
+              <RefreshCw className="mr-1 h-4 w-4" /> Restart Quiz
             </Button>
           </Alert>
         </CardContent>
@@ -260,11 +260,11 @@ export function KnowledgeQuizSession() {
   }
 
   return (
-    <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
+    <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card m-1">
       {currentStep === 'config' && (
         <>
-          <CardHeader className="bg-muted/50 p-4 sm:p-6 border-b">
-            <div className="flex items-center gap-3">
+          <CardHeader className="bg-muted/50 p-1 border-b">
+            <div className="flex items-center space-x-1">
               <BookOpen className="w-8 h-8 text-primary" />
               <div>
                 <CardTitle className="text-2xl">Configure Your Quiz</CardTitle>
@@ -272,9 +272,9 @@ export function KnowledgeQuizSession() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6">
+          <CardContent className="p-1">
              <Form {...configForm}>
-              <form onSubmit={configForm.handleSubmit(handleConfigSubmit)} className="space-y-6">
+              <form onSubmit={configForm.handleSubmit(handleConfigSubmit)} className="space-y-1">
                 <FormField
                   control={configForm.control}
                   name="topic"
@@ -313,7 +313,7 @@ export function KnowledgeQuizSession() {
                   )}
                 />
                 <Button type="submit" size="lg" className="w-full shadow-md" disabled={isLoading || isEvaluating}>
-                  {isLoading || isEvaluating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-2 h-5 w-5" />}
+                  {isLoading || isEvaluating ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-1 h-5 w-5" />}
                   Start Quiz
                 </Button>
               </form>
@@ -324,27 +324,27 @@ export function KnowledgeQuizSession() {
 
       {currentStep === 'questioning' && currentQuestionText && (
         <>
-          <CardHeader className="bg-muted/50 p-4 sm:p-6 border-b">
+          <CardHeader className="bg-muted/50 p-1 border-b">
              <CardTitle className="text-xl text-center sm:text-left text-primary">Topic: {topic}</CardTitle>
              <CardDescription className="text-center sm:text-left">Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Question {history.length + (showExplanationSection ? 0 : 1)}</CardDescription>
           </CardHeader>
           
           {history.length > 0 && !showExplanationSection && ( 
-            <CardContent className="p-3 sm:p-4 max-h-60 overflow-y-auto"> {/* Modified: Made CardContent scrollable */}
-              <h3 className="text-md font-semibold text-muted-foreground mb-2 sticky top-0 bg-card z-10 py-1">Previous Questions:</h3> {/* Modified: Made h3 sticky */}
-              <div className="space-y-4 pt-1"> {/* Modified: Added padding top for sticky header */}
+            <CardContent className="p-1 max-h-60 overflow-y-auto">
+              <h3 className="text-md font-semibold text-muted-foreground mb-1 sticky top-0 bg-card z-10 py-1">Previous Questions:</h3>
+              <div className="space-y-1 pt-1">
                 {history.map((item, index) => (
-                  <div key={index} className="text-sm p-2 sm:p-3 rounded-md bg-muted/30 border border-border/70 shadow-sm">
+                  <div key={index} className="text-sm p-1 rounded-md bg-muted/30 border border-border/70 shadow-sm">
                     <div className="flex items-start">
-                      <MessageCircle className="w-4 h-4 mr-2 text-primary shrink-0 mt-[3px]"/>
+                      <MessageCircle className="w-4 h-4 mr-1 text-primary shrink-0 mt-[3px]"/>
                       <div className="flex-1">
                         <span className="font-medium text-card-foreground whitespace-pre-wrap">{item.question}</span>
                       </div>
                       {typeof item.isCorrect === 'boolean' && (
-                        item.isCorrect ? <span className="ml-2 text-xl self-start">🎉</span> : <span className="ml-2 text-xl self-start">🤔</span>
+                        item.isCorrect ? <span className="ml-1 text-xl self-start">🎉</span> : <span className="ml-1 text-xl self-start">🤔</span>
                       )}
                     </div>
-                    <p className="mt-1 sm:mt-2 text-muted-foreground pl-[calc(1rem+0.5rem)] whitespace-pre-wrap"> 
+                    <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap"> 
                       <span className="font-semibold">Your Answer: </span>{item.answer}
                     </p>
                   </div>
@@ -353,15 +353,15 @@ export function KnowledgeQuizSession() {
             </CardContent>
           )}
 
-          <CardContent className="p-4 sm:p-6">
+          <CardContent className="p-1">
             <Form {...answerForm}>
-              <form onSubmit={answerForm.handleSubmit(handleAnswerSubmit)} className="space-y-6">
+              <form onSubmit={answerForm.handleSubmit(handleAnswerSubmit)} className="space-y-1">
                 <FormField
                   control={answerForm.control}
                   name="answer"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xl font-medium text-card-foreground mb-2 sm:mb-3 block whitespace-pre-wrap">
+                      <FormLabel className="text-xl font-medium text-card-foreground mb-1 block whitespace-pre-wrap">
                         {currentQuestionText}
                       </FormLabel>
                       <FormControl>
@@ -379,7 +379,7 @@ export function KnowledgeQuizSession() {
                 />
 
                 {showExplanationSection && currentExplanation && (
-                  <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/40 shadow-sm rounded-md">
+                  <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/40 shadow-sm rounded-md p-1">
                     <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400" />
                     <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
                     <AlertDescription className="text-green-700/90 dark:text-green-400/90 whitespace-pre-wrap">
@@ -390,15 +390,15 @@ export function KnowledgeQuizSession() {
 
                 {showExplanationSection ? (
                    <Button onClick={handleProceedToNextQuestion} className="w-full sm:w-auto shadow-md" disabled={isLoading}>
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                    {isLoading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1 h-4 w-4" />}
                     Next Question
                   </Button>
                 ) : (
                   <Button type="submit" className="w-full sm:w-auto shadow-md" disabled={isLoading || isEvaluating || answerForm.formState.isSubmitting}>
                     {isEvaluating ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                     ) : (
-                      <Send className="mr-2 h-4 w-4" />
+                      <Send className="mr-1 h-4 w-4" />
                     )}
                     {isEvaluating ? 'Evaluating...' : 'Submit Answer'}
                   </Button>
@@ -406,7 +406,7 @@ export function KnowledgeQuizSession() {
               </form>
             </Form>
           </CardContent>
-          <CardFooter className="p-4 sm:p-6 border-t bg-muted/50 flex justify-center">
+          <CardFooter className="p-1 border-t bg-muted/50 flex justify-center">
             <Button variant="ghost" size="sm" onClick={handleRestartQuiz} className="text-muted-foreground hover:text-destructive" disabled={isLoading || isEvaluating}>
               Cancel Quiz
             </Button>
@@ -416,33 +416,33 @@ export function KnowledgeQuizSession() {
 
       {currentStep === 'summary' && (
         <>
-          <CardHeader className="bg-muted/50 p-4 sm:p-6 border-b text-center">
-            <div className="flex items-center justify-center gap-3 mb-2">
+          <CardHeader className="bg-muted/50 p-1 border-b text-center">
+            <div className="flex items-center justify-center space-x-1 mb-1">
                 <CheckCircle2 className="w-10 h-10 text-accent" />
                 <CardTitle className="text-2xl">Quiz Summary</CardTitle>
             </div>
             <CardDescription>Topic: {topic} | Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()}</CardDescription>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6 space-y-6">
+          <CardContent className="p-1 space-y-1">
             {history.length > 0 && (
-                <Card className="bg-background/50 shadow-md">
-                    <CardHeader className="p-3 sm:p-4">
-                        <CardTitle className="text-lg text-primary flex items-center gap-2"><Check className="w-5 h-5"/>Your Answers & Explanations:</CardTitle>
+                <Card className="bg-background/50 shadow-md m-1">
+                    <CardHeader className="p-1">
+                        <CardTitle className="text-lg text-primary flex items-center space-x-1"><Check className="w-5 h-5"/>Your Answers & Explanations:</CardTitle>
                     </CardHeader>
-                    <CardContent className="max-h-96 p-3 sm:p-4">
-                         <ScrollArea className="h-full pr-3">
-                            <div className="space-y-4">
+                    <CardContent className="max-h-96 p-1">
+                         <ScrollArea className="h-full pr-1">
+                            <div className="space-y-1">
                             {history.map((item, index) => (
-                            <div key={index} className="text-sm p-3 rounded-md bg-muted/30 border border-border/50 shadow-inner">
+                            <div key={index} className="text-sm p-1 rounded-md bg-muted/30 border border-border/50 shadow-inner">
                                 <div className="font-medium text-card-foreground flex items-start">
                                     <span className="mr-1 flex-1 whitespace-pre-wrap">{index+1}. {item.question}</span>
                                     {typeof item.isCorrect === 'boolean' && (
-                                      item.isCorrect ? <span className="ml-2 text-xl self-start">🎉</span> : <span className="ml-2 text-xl self-start">🤔</span>
+                                      item.isCorrect ? <span className="ml-1 text-xl self-start">🎉</span> : <span className="ml-1 text-xl self-start">🤔</span>
                                     )}
                                 </div>
-                                <p className="text-xs text-muted-foreground pl-4 mt-1 whitespace-pre-wrap"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
+                                <p className="text-xs text-muted-foreground pl-1 mt-1 whitespace-pre-wrap"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
                                 {item.explanation && (
-                                  <div className="mt-2 p-2 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
+                                  <div className="mt-1 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
                                     <p className="font-semibold text-green-700 dark:text-green-300">Explanation:</p>
                                     <p className="text-green-700/90 dark:text-green-400/90 whitespace-pre-wrap">{item.explanation}</p>
                                   </div>
@@ -455,21 +455,21 @@ export function KnowledgeQuizSession() {
                 </Card>
             )}
             {summaryText && (
-                <Card className="bg-background/50 shadow-md">
-                <CardHeader className="p-3 sm:p-4">
-                    <CardTitle className="text-xl text-primary flex items-center gap-2"><Lightbulb className="w-5 h-5"/>Main Summary</CardTitle>
+                <Card className="bg-background/50 shadow-md m-1">
+                <CardHeader className="p-1">
+                    <CardTitle className="text-xl text-primary flex items-center space-x-1"><Lightbulb className="w-5 h-5"/>Main Summary</CardTitle>
                 </CardHeader>
-                <CardContent className="p-3 sm:p-4">
+                <CardContent className="p-1">
                     <p className="text-card-foreground whitespace-pre-wrap">{summaryText}</p>
                 </CardContent>
                 </Card>
             )}
             {furtherLearningSuggestions && furtherLearningSuggestions.length > 0 && (
-                 <Card className="bg-background/50 shadow-md">
-                    <CardHeader className="p-3 sm:p-4">
-                        <CardTitle className="text-xl text-accent flex items-center gap-2"><BookOpen className="w-5 h-5"/>Further Learning</CardTitle>
+                 <Card className="bg-background/50 shadow-md m-1">
+                    <CardHeader className="p-1">
+                        <CardTitle className="text-xl text-accent flex items-center space-x-1"><BookOpen className="w-5 h-5"/>Further Learning</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-3 sm:p-4">
+                    <CardContent className="p-1">
                         <ul className="list-disc pl-5 space-y-1 text-card-foreground">
                         {furtherLearningSuggestions.map((suggestion, index) => (
                             <li key={index} className="whitespace-pre-wrap">{suggestion}</li>
@@ -482,9 +482,9 @@ export function KnowledgeQuizSession() {
                 <p className="text-muted-foreground text-center">No summary or learning suggestions were generated for this session.</p>
             )}
           </CardContent>
-          <CardFooter className="p-4 sm:p-6 border-t bg-muted/50 flex justify-center">
+          <CardFooter className="p-1 border-t bg-muted/50 flex justify-center">
             <Button onClick={handleRestartQuiz} variant="outline" className="w-full sm:w-auto shadow-md">
-                <RefreshCw className="mr-2 h-4 w-4" /> Start New Quiz
+                <RefreshCw className="mr-1 h-4 w-4" /> Start New Quiz
             </Button>
           </CardFooter>
         </>
@@ -492,4 +492,3 @@ export function KnowledgeQuizSession() {
     </Card>
   );
 }
-
