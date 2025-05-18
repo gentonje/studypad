@@ -53,16 +53,20 @@ User's Answer: {{{userAnswer}}}
 
 Please provide your response in {{#if language}}{{language}}{{else}}English{{/if}}.
 1.  \`awardedScore\`: An integer score from 0 to 5 based on the correctness and completeness of the user's answer relative to the question, topic, education level{{#if pdfDataUri}}, and provided document context{{/if}}.
-    *   0: Completely incorrect, irrelevant, or nonsensical.
-    *   1: Shows minimal understanding, perhaps a relevant keyword but fundamentally flawed or very incomplete.
-    *   2: Basic understanding, some correct points but significant inaccuracies or omissions.
-    *   3: Partially correct; understands the main concepts but has some inaccuracies or lacks depth/detail.
-    *   4: Mostly correct and well-understood; minor inaccuracies or could be slightly more detailed/clearer.
-    *   5: Fully correct, comprehensive for the education level, and clearly articulated.
+    *   **Adapt your scoring strictness to the student's \`educationLevel\`.**
+        *   For lower levels (e.g., Preschool, ElementarySchool, MiddleSchool), be more lenient. Focus on whether the core concept is grasped, even if the answer is simple or uses basic language. A partially correct or very simple but relevant answer might still earn a 2 or 3.
+        *   For higher levels (e.g., College, Graduate, PhD), be stricter. Expect more depth, precision, use of specific terminology, and comprehensive understanding. Minor inaccuracies or lack of detail will result in a lower score compared to the same answer at a lower education level.
+    *   General Scoring Guide (apply with education level in mind):
+        *   0: Completely incorrect, irrelevant, or nonsensical.
+        *   1: Shows minimal understanding, perhaps a relevant keyword but fundamentally flawed or very incomplete.
+        *   2: Basic understanding, some correct points but significant inaccuracies or omissions for the level.
+        *   3: Partially correct; understands the main concepts but has some inaccuracies or lacks depth/detail expected for the level.
+        *   4: Mostly correct and well-understood; minor inaccuracies or could be slightly more detailed/clearer for the level.
+        *   5: Fully correct, comprehensive for the education level, and clearly articulated.
 2.  \`explanation\`: A detailed, teacher-like explanation.
     *   Regardless of the score, explain the reasoning behind it in {{#if language}}{{language}}{{else}}English{{/if}}.
-    *   If the score is less than 5, clearly explain the misunderstanding, errors, or omissions. Provide the correct information and explain the reasoning behind it.
-    *   If the score is 5, reinforce why the answer is excellent, perhaps adding a bit more relevant detail or context.
+    *   If the score is less than 5, clearly explain the misunderstanding, errors, or omissions, keeping the student's \`educationLevel\` in mind. Provide the correct information and explain the reasoning behind it in an age-appropriate manner.
+    *   If the score is 5, reinforce why the answer is excellent, perhaps adding a bit more relevant detail or context suitable for the \`educationLevel\`.
     *   The explanation MUST be tailored to the student's specified education level and language ({{#if language}}{{language}}{{else}}English{{/if}}). It should help them understand the concept better. Use analogies or simpler terms if appropriate for the level and language.
     *   IMPORTANT: The explanation should be in **PLAIN TEXT** only. Do NOT use Markdown formatting like \`**bold**\`, \`*italics*\`, or table structures. Use natural language and paragraphs for clear separation of ideas.
 3.  \`imageSuggestion\`: If a simple image, diagram, or pictorial could significantly help in understanding the explanation (e.g., for visual concepts like a cell structure, a historical map, a type of rock), provide a one or two-word search term for such an image. Examples: "cell mitosis", "roman aqueduct", "igneous rock". If no image is particularly helpful, omit this field. Maximum two words. These terms should be in English or a broadly understandable format for image search.
@@ -101,3 +105,5 @@ const evaluateAnswerGenkitFlow = ai.defineFlow(
   }
 );
 
+
+    
