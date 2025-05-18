@@ -1,6 +1,8 @@
 
 "use client";
 
+import type { StaticImageData } from 'next/image';
+import Image from 'next/image';
 import { useState, useEffect, type FormEvent } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type SubmitHandler } from "react-hook-form";
@@ -18,7 +20,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check, ArrowRight } from 'lucide-react';
+import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check, ArrowRight, Image as ImageIcon, ExternalLink, ThumbsUp } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const configFormSchema = z.object({
@@ -37,12 +39,16 @@ interface HistoryItem {
   answer: string;
   isCorrect?: boolean;
   explanation?: string;
+  imageSuggestion?: string;
 }
 
 export function KnowledgeQuizSession() {
   const [currentStep, setCurrentStep] = useState<'config' | 'questioning' | 'summary' | 'loading' | 'error'>('config');
   const [currentQuestionText, setCurrentQuestionText] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [incorrectlyAnsweredQuestions, setIncorrectlyAnsweredQuestions] = useState<HistoryItem[]>([]);
+  const [isReviewMode, setIsReviewMode] = useState(false);
+  const [currentReviewQuestionIndex, setCurrentReviewQuestionIndex] = useState(0);
   const [summaryText, setSummaryText] = useState<string | null>(null);
   const [furtherLearningSuggestions, setFurtherLearningSuggestions] = useState<string[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -51,6 +57,7 @@ export function KnowledgeQuizSession() {
   const [isLoading, setIsLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [currentExplanation, setCurrentExplanation] = useState<string | null>(null);
+  const [currentImageSuggestion, setCurrentImageSuggestion] = useState<string | null>(null);
   const [showExplanationSection, setShowExplanationSection] = useState(false);
 
 
@@ -77,6 +84,7 @@ export function KnowledgeQuizSession() {
     setErrorMessage(null);
     setShowExplanationSection(false);
     setCurrentExplanation(null);
+    setCurrentImageSuggestion(null);
     try {
       const input: KnowledgeQuizInput = { previousAnswers: [], topic: currentTopic, educationLevel: currentEducationLevel };
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
@@ -100,6 +108,9 @@ export function KnowledgeQuizSession() {
     setTopic(data.topic);
     setEducationLevel(data.educationLevel);
     setHistory([]);
+    setIncorrectlyAnsweredQuestions([]);
+    setIsReviewMode(false);
+    setCurrentReviewQuestionIndex(0);
     fetchInitialQuestion(data.topic, data.educationLevel);
   };
 
@@ -109,6 +120,7 @@ export function KnowledgeQuizSession() {
     setErrorMessage(null);
     setShowExplanationSection(false);
     setCurrentExplanation(null);
+    setCurrentImageSuggestion(null);
     try {
       const input: KnowledgeQuizInput = { previousAnswers: updatedHistory.map(h => ({question: h.question, answer: h.answer})), topic: currentTopic, educationLevel: currentEducationLevel };
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
@@ -117,6 +129,8 @@ export function KnowledgeQuizSession() {
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
+        // Main quiz round finished
+        setIncorrectlyAnsweredQuestions(updatedHistory.filter(item => !item.isCorrect));
         fetchQuizSummary(currentTopic, currentEducationLevel, updatedHistory);
       }
     } catch (error) {
@@ -135,6 +149,7 @@ export function KnowledgeQuizSession() {
     setErrorMessage(null);
     setShowExplanationSection(false);
     setCurrentExplanation(null);
+    setCurrentImageSuggestion(null);
     try {
       const responses = finalHistory.reduce((acc, item, index) => {
         acc[`q${index}_${item.question.substring(0,15).replace(/\s/g,'_')}`] = item.answer;
@@ -145,8 +160,9 @@ export function KnowledgeQuizSession() {
       const output: QuizSummaryOutput = await getQuizSummary(input);
       setSummaryText(output.summary);
       setFurtherLearningSuggestions(output.furtherLearningSuggestions);
+      setIncorrectlyAnsweredQuestions(finalHistory.filter(item => !item.isCorrect)); // Update in case summary is called directly
       setCurrentStep('summary');
-      toast({ title: "Quiz Complete", description: "Personalized summary generated.", variant: "default" });
+      toast({ title: "Quiz Complete!", description: "Personalized summary generated.", variant: "default" });
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching quiz summary:", error);
       setErrorMessage("Sorry, I couldn't generate your quiz summary. Please try again or restart.");
@@ -162,9 +178,11 @@ export function KnowledgeQuizSession() {
     setIsEvaluating(true);
     setShowExplanationSection(false);
     setCurrentExplanation(null); 
+    setCurrentImageSuggestion(null);
 
     let isCorrect = false;
     let explanationText = "Could not retrieve explanation for this answer.";
+    let imgSuggestion: string | undefined = undefined;
 
     try {
       const evalInput: EvaluateAnswerInput = {
@@ -176,11 +194,12 @@ export function KnowledgeQuizSession() {
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
       isCorrect = evalOutput.isCorrect;
       explanationText = evalOutput.explanation || (isCorrect ? "Great job!" : "That's not quite right, let's look at why.");
+      imgSuggestion = evalOutput.imageSuggestion;
 
       if (isCorrect) {
-        toast({ title: "Correct!", description: explanationText.substring(0, 100) + (explanationText.length > 100 ? "..." : ""), variant: "default", duration: 3000 });
+        toast({ title: "Correct! 🎉", description: explanationText.substring(0, 100) + (explanationText.length > 100 ? "..." : ""), variant: "default", duration: 3000 });
       } else {
-        toast({ title: "Check Explanation", description: explanationText.substring(0,100) + (explanationText.length > 100 ? "..." : ""), variant: "default", duration: 3500 });
+        toast({ title: "Let's review 🤔", description: explanationText.substring(0,100) + (explanationText.length > 100 ? "..." : ""), variant: "default", duration: 3500 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
@@ -190,19 +209,62 @@ export function KnowledgeQuizSession() {
       setIsEvaluating(false);
     }
 
-    const newHistoryItem: HistoryItem = { question: currentQuestionText, answer: data.answer, isCorrect, explanation: explanationText };
-    const updatedHistory = [...history, newHistoryItem];
-    setHistory(updatedHistory);
+    const newHistoryItem: HistoryItem = { 
+        question: currentQuestionText, 
+        answer: data.answer, 
+        isCorrect, 
+        explanation: explanationText,
+        imageSuggestion: imgSuggestion
+    };
+    
+    if (isReviewMode) {
+        // For review mode, we might want to update the original history item or a separate review history
+        // For now, let's just update the display values and not persist changes to `incorrectlyAnsweredQuestions` during review
+    } else {
+        const updatedHistory = [...history, newHistoryItem];
+        setHistory(updatedHistory);
+    }
     
     setCurrentExplanation(explanationText);
+    setCurrentImageSuggestion(imgSuggestion || null);
     setShowExplanationSection(true);
   };
 
   const handleProceedToNextQuestion = () => {
     setShowExplanationSection(false);
     setCurrentExplanation(null);
+    setCurrentImageSuggestion(null);
     answerForm.reset(); 
-    fetchNextQuestion(topic, educationLevel, history); 
+
+    if (isReviewMode) {
+        const nextIndex = currentReviewQuestionIndex + 1;
+        if (nextIndex < incorrectlyAnsweredQuestions.length) {
+            setCurrentReviewQuestionIndex(nextIndex);
+            setCurrentQuestionText(incorrectlyAnsweredQuestions[nextIndex].question);
+            setCurrentStep('questioning');
+        } else {
+            // Review finished
+            setIsReviewMode(false);
+            setCurrentStep('summary'); // Go back to summary view
+            toast({title: "Review Complete!", description: "You've reviewed all incorrect answers.", variant: "default"});
+        }
+    } else {
+        fetchNextQuestion(topic, educationLevel, history); 
+    }
+  };
+
+  const handleStartReview = () => {
+    if (incorrectlyAnsweredQuestions.length > 0) {
+        setIsReviewMode(true);
+        setCurrentReviewQuestionIndex(0);
+        setCurrentQuestionText(incorrectlyAnsweredQuestions[0].question);
+        setCurrentExplanation(null);
+        setCurrentImageSuggestion(null);
+        setShowExplanationSection(false);
+        answerForm.reset();
+        setCurrentStep('questioning');
+        toast({title: "Review Mode", description: "Let's go over the questions you missed.", variant: "default"});
+    }
   };
   
   const handleRestartQuiz = () => {
@@ -213,20 +275,24 @@ export function KnowledgeQuizSession() {
     setFurtherLearningSuggestions(null);
     setErrorMessage(null);
     setTopic("");
+    setIncorrectlyAnsweredQuestions([]);
+    setIsReviewMode(false);
+    setCurrentReviewQuestionIndex(0);
     configForm.reset({ topic: "", educationLevel: "HighSchool" });
     answerForm.reset();
     setIsLoading(false);
     setIsEvaluating(false);
     setShowExplanationSection(false);
     setCurrentExplanation(null);
+    setCurrentImageSuggestion(null);
   };
 
   const getLoadingMessage = () => {
     if (isEvaluating && !showExplanationSection) return "Evaluating your answer...";
     if (currentStep === 'loading') {
-        if (!currentQuestionText && !summaryText && history.length === 0) return "Preparing your quiz...";
+        if (!currentQuestionText && !summaryText && history.length === 0 && !isReviewMode) return "Preparing your quiz...";
         if (currentQuestionText && !summaryText) return "Getting next question...";
-        if (summaryText === null && history.length > 0) return "Generating your summary...";
+        if (summaryText === null && history.length > 0 && !isReviewMode) return "Generating your summary...";
     }
     return "Loading...";
   };
@@ -325,23 +391,28 @@ export function KnowledgeQuizSession() {
       {currentStep === 'questioning' && currentQuestionText && (
         <>
           <CardHeader className="bg-muted/50 p-1 border-b">
-             <CardTitle className="text-xl text-center sm:text-left text-primary">Topic: {topic}</CardTitle>
-             <CardDescription className="text-center sm:text-left">Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Question {history.length + (showExplanationSection ? 0 : 1)}</CardDescription>
+             <CardTitle className="text-xl text-center sm:text-left text-primary">
+                {isReviewMode ? "Reviewing: " : "Topic: "}{topic}
+             </CardTitle>
+             <CardDescription className="text-center sm:text-left">
+                Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | 
+                {isReviewMode ? ` Review Question ${currentReviewQuestionIndex + 1} of ${incorrectlyAnsweredQuestions.length}` : ` Question ${history.length + (showExplanationSection ? 0 : 1)}`}
+             </CardDescription>
           </CardHeader>
           
-          {history.length > 0 && !showExplanationSection && ( 
-            <CardContent className="p-1 max-h-60 overflow-y-auto">
-              <h3 className="text-md font-semibold text-muted-foreground mb-1 sticky top-0 bg-card z-10 py-1">Previous Questions:</h3>
+          {history.length > 0 && !showExplanationSection && !isReviewMode && ( 
+            <CardContent className="p-1 max-h-60 overflow-y-auto bg-muted/20">
+              <h3 className="text-md font-semibold text-muted-foreground mb-1 sticky top-0 bg-card z-10 py-1 px-1">Previous Questions:</h3>
               <div className="space-y-1 pt-1">
                 {history.map((item, index) => (
-                  <div key={index} className="text-sm p-1 rounded-md bg-muted/30 border border-border/70 shadow-sm">
+                  <div key={`hist-${index}`} className="text-sm p-1 rounded-md bg-background/70 border border-border/70 shadow-sm">
                     <div className="flex items-start space-x-1">
                       <MessageCircle className="w-4 h-4 mr-1 text-primary shrink-0 mt-[3px]"/>
                       <div className="flex-1">
                         <span className="font-medium text-card-foreground whitespace-pre-wrap">{item.question}</span>
                       </div>
                       {typeof item.isCorrect === 'boolean' && (
-                        item.isCorrect ? <span className="ml-1 text-xl self-start">🎉</span> : <span className="ml-1 text-xl self-start">🤔</span>
+                        item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <span className="ml-1 text-xl self-start">🤔</span>
                       )}
                     </div>
                     <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap"> 
@@ -379,22 +450,43 @@ export function KnowledgeQuizSession() {
                 />
 
                 {showExplanationSection && currentExplanation && (
-                  <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/40 shadow-sm rounded-md p-1">
+                  <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/40 shadow-sm rounded-md p-1 my-1">
                     <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
                     <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
                     <AlertDescription className="text-green-700/90 dark:text-green-400/90 whitespace-pre-wrap">
                       {currentExplanation}
                     </AlertDescription>
+                    {currentImageSuggestion && (
+                        <div className="mt-1 p-1 border-t border-green-200 dark:border-green-700/30">
+                            <p className="text-xs text-green-600 dark:text-green-400/80 mb-1 italic">Suggested image for clarity:</p>
+                            <Image 
+                                src={`https://placehold.co/300x200.png`} 
+                                alt={currentImageSuggestion}
+                                width={300}
+                                height={200}
+                                className="rounded shadow-md border border-green-300 dark:border-green-600"
+                                data-ai-hint={currentImageSuggestion}
+                            />
+                             <a 
+                                href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(currentImageSuggestion)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center mt-1"
+                              >
+                                Search for this image <ExternalLink className="w-3 h-3 ml-1" />
+                              </a>
+                        </div>
+                    )}
                   </Alert>
                 )}
 
                 {showExplanationSection ? (
-                   <Button onClick={handleProceedToNextQuestion} className="w-full sm:w-auto shadow-md" disabled={isLoading}>
+                   <Button onClick={handleProceedToNextQuestion} className="w-full shadow-md" disabled={isLoading}>
                     {isLoading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1 h-4 w-4" />}
-                    Next Question
+                    {isReviewMode && currentReviewQuestionIndex >= incorrectlyAnsweredQuestions.length -1 ? "Finish Review" : "Next Question"}
                   </Button>
                 ) : (
-                  <Button type="submit" className="w-full sm:w-auto shadow-md" disabled={isLoading || isEvaluating || answerForm.formState.isSubmitting}>
+                  <Button type="submit" className="w-full shadow-md" disabled={isLoading || isEvaluating || answerForm.formState.isSubmitting}>
                     {isEvaluating ? (
                       <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                     ) : (
@@ -433,11 +525,11 @@ export function KnowledgeQuizSession() {
                          <ScrollArea className="h-full pr-1">
                             <div className="space-y-1">
                             {history.map((item, index) => (
-                            <div key={index} className="text-sm p-1 rounded-md bg-muted/30 border border-border/50 shadow-inner">
+                            <div key={`summary-hist-${index}`} className="text-sm p-1 rounded-md bg-muted/30 border border-border/50 shadow-inner">
                                 <div className="font-medium text-card-foreground flex items-start space-x-1">
                                     <span className="mr-1 flex-1 whitespace-pre-wrap">{index+1}. {item.question}</span>
                                     {typeof item.isCorrect === 'boolean' && (
-                                      item.isCorrect ? <span className="ml-1 text-xl self-start">🎉</span> : <span className="ml-1 text-xl self-start">🤔</span>
+                                      item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <span className="ml-1 text-xl self-start">🤔</span>
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground pl-1 mt-1 whitespace-pre-wrap"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
@@ -445,6 +537,26 @@ export function KnowledgeQuizSession() {
                                   <div className="mt-1 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
                                     <p className="font-semibold text-green-700 dark:text-green-300">Explanation:</p>
                                     <p className="text-green-700/90 dark:text-green-400/90 whitespace-pre-wrap">{item.explanation}</p>
+                                    {item.imageSuggestion && (
+                                        <div className="mt-1 pt-1 border-t border-green-200 dark:border-green-700/30">
+                                             <Image 
+                                                src={`https://placehold.co/200x150.png`} 
+                                                alt={item.imageSuggestion}
+                                                width={200}
+                                                height={150}
+                                                className="rounded shadow-sm border border-green-300 dark:border-green-600 my-1"
+                                                data-ai-hint={item.imageSuggestion}
+                                            />
+                                            <a 
+                                              href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(item.imageSuggestion)}`}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center"
+                                            >
+                                              Search for: "{item.imageSuggestion}" <ExternalLink className="w-3 h-3 ml-1" />
+                                            </a>
+                                        </div>
+                                    )}
                                   </div>
                                 )}
                             </div>
@@ -472,7 +584,7 @@ export function KnowledgeQuizSession() {
                     <CardContent className="p-1">
                         <ul className="list-disc pl-5 space-y-1 text-card-foreground">
                         {furtherLearningSuggestions.map((suggestion, index) => (
-                            <li key={index} className="whitespace-pre-wrap">{suggestion}</li>
+                            <li key={`learn-${index}`} className="whitespace-pre-wrap">{suggestion}</li>
                         ))}
                         </ul>
                     </CardContent>
@@ -480,6 +592,21 @@ export function KnowledgeQuizSession() {
             )}
             {!summaryText && (!furtherLearningSuggestions || furtherLearningSuggestions.length === 0) && (
                 <p className="text-muted-foreground text-center">No summary or learning suggestions were generated for this session.</p>
+            )}
+            {incorrectlyAnsweredQuestions.length > 0 && !isReviewMode && (
+                 <Card className="bg-orange-50 dark:bg-orange-900/30 shadow-md m-1 border-orange-300 dark:border-orange-700">
+                    <CardHeader className="p-1">
+                        <CardTitle className="text-xl text-orange-600 dark:text-orange-400 flex items-center space-x-1">
+                            <RefreshCw className="w-5 h-5 mr-1"/>Review Your Answers
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-1">
+                        <p className="text-card-foreground mb-1">You had {incorrectlyAnsweredQuestions.length} incorrect answer(s). Would you like to review them?</p>
+                        <Button onClick={handleStartReview} className="w-full sm:w-auto shadow-md bg-orange-500 hover:bg-orange-600 text-white">
+                            <RefreshCw className="mr-1 h-4 w-4" /> Start Review Session
+                        </Button>
+                    </CardContent>
+                </Card>
             )}
           </CardContent>
           <CardFooter className="p-1 border-t bg-muted/50 flex justify-center">

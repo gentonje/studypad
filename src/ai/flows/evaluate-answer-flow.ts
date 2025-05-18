@@ -1,7 +1,8 @@
 
 'use server';
 /**
- * @fileOverview An AI agent that evaluates a user's answer to a quiz question.
+ * @fileOverview An AI agent that evaluates a user's answer to a quiz question,
+ * providing detailed explanations and suggesting images for clarity.
  *
  * - evaluateAnswer - A function that handles the answer evaluation.
  * - EvaluateAnswerInput - The input type for the evaluateAnswer function.
@@ -9,7 +10,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z}from 'genkit';
 import { EducationLevels, type EducationLevel } from './types';
 
 const EvaluateAnswerInputSchema = z.object({
@@ -22,7 +23,8 @@ export type EvaluateAnswerInput = z.infer<typeof EvaluateAnswerInputSchema>;
 
 const EvaluateAnswerOutputSchema = z.object({
   isCorrect: z.boolean().describe('Whether the user answer is considered correct for the given question, topic, and education level.'),
-  explanation: z.string().describe('A clear and concise explanation for why the answer is correct or incorrect, tailored to the education level. This should always be provided.'),
+  explanation: z.string().describe('A detailed, teacher-like explanation for why the answer is correct or incorrect, tailored to the education level. This should always be provided and aim to help the student understand the underlying concept thoroughly.'),
+  imageSuggestion: z.string().optional().describe("A one or two-word search term for an image that could visually clarify the explanation, if applicable. Max two words. E.g., 'photosynthesis diagram' or 'volcano eruption'.")
 });
 export type EvaluateAnswerOutput = z.infer<typeof EvaluateAnswerOutputSchema>;
 
@@ -34,10 +36,7 @@ const evaluateAnswerPrompt = ai.definePrompt({
   name: 'evaluateAnswerPrompt',
   input: {schema: EvaluateAnswerInputSchema},
   output: {schema: EvaluateAnswerOutputSchema},
-  prompt: `You are an AI quiz evaluator. Your task is to determine if the user's answer is correct for the given question, considering the topic and education level.
-You MUST provide:
-1. A boolean \`isCorrect\`.
-2. A clear and concise \`explanation\` for why the answer is correct or incorrect. This explanation MUST be tailored to the user's specified education level and should help them understand the concept better.
+  prompt: `You are an expert AI educator evaluating a student's answer to a quiz question. Your goal is not just to mark it right or wrong, but to help the student truly understand the concept.
 
 Topic: {{{topic}}}
 Education Level: {{{educationLevel}}}
@@ -45,9 +44,15 @@ Education Level: {{{educationLevel}}}
 Question: {{{question}}}
 User's Answer: {{{userAnswer}}}
 
-Based on this information, evaluate the user's answer. Be reasonably flexible with phrasing if the core concept is correct for the given education level.
-If the answer is too vague, or clearly wrong, mark it as incorrect.
-Ensure the explanation is helpful and directly addresses the user's answer in relation to the question.
+Please provide:
+1.  \`isCorrect\`: A boolean indicating if the user's answer is substantially correct for the given question, topic, and education level. Be reasonably flexible with phrasing if the core concept is correct. If the answer is too vague, or clearly wrong, mark it as incorrect.
+2.  \`explanation\`: A detailed, teacher-like explanation.
+    *   If correct: Explain *why* it's correct, perhaps reinforcing the key concepts or adding a bit more relevant detail.
+    *   If incorrect: Clearly explain the misunderstanding or error. Provide the correct information and explain the reasoning behind it.
+    *   The explanation MUST be tailored to the student's specified education level and should help them understand the concept better. Use analogies or simpler terms if appropriate for the level.
+3.  \`imageSuggestion\`: If a simple image, diagram, or pictorial could significantly help in understanding the explanation (e.g., for visual concepts like a cell structure, a historical map, a type of rock), provide a one or two-word search term for such an image. Examples: "cell mitosis", "roman aqueduct", "igneous rock". If no image is particularly helpful, omit this field. Maximum two words.
+
+Ensure your output strictly adheres to the requested JSON format and that the explanation is thorough and pedagogical.
 `,
 });
 
@@ -61,13 +66,12 @@ const evaluateAnswerGenkitFlow = ai.defineFlow(
     const {output} = await evaluateAnswerPrompt(input);
     if (!output || typeof output.isCorrect !== 'boolean' || !output.explanation) {
         console.error('AI output for evaluateAnswerFlow was invalid or incomplete:', output);
-        // Fallback if AI fails to provide a clear boolean or explanation
         return { 
             isCorrect: false, 
-            explanation: "Could not determine correctness or provide a detailed explanation at this time. Please ensure your answer is clear." 
+            explanation: "Could not determine correctness or provide a detailed explanation at this time. Please ensure your answer is clear.",
+            imageSuggestion: undefined
         };
     }
     return output;
   }
 );
-
