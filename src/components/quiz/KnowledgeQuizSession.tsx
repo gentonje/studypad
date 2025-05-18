@@ -80,7 +80,7 @@ export function KnowledgeQuizSession() {
   });
 
   useEffect(() => {
-    // console.log("KnowledgeQuizSession: Education level set to:", educationLevel);
+    // console.log("KnowledgeQuizSession: Education level from component state:", educationLevel);
   }, [educationLevel]);
 
   const fetchInitialQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel) => {
@@ -197,14 +197,15 @@ export function KnowledgeQuizSession() {
         educationLevel: educationLevel,
       };
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
+      console.log("AI Evaluation Output:", evalOutput); // Log the AI output
       isCorrect = evalOutput.isCorrect;
       explanationText = evalOutput.explanation || (isCorrect ? "Great job!" : "That's not quite right, let's look at why.");
       imgSuggestion = evalOutput.imageSuggestion;
 
       if (isCorrect) {
-        toast({ title: "Correct! 🎉", description: evalOutput.explanation ? "See explanation below." : "Well done!", variant: "default", duration: 3000 });
+        toast({ icon: <ThumbsUp className="text-green-500" />, title: "Correct! 🎉", description: evalOutput.explanation ? "See explanation below." : "Well done!", variant: "default", duration: 3000 });
       } else {
-        toast({ title: "Let's review 🤔", description: evalOutput.explanation ? "See explanation below." : "Take a look at the explanation.", variant: "default", duration: 3500 });
+        toast({ icon: <span className="text-xl">🤔</span>, title: "Let's review", description: evalOutput.explanation ? "See explanation below." : "Take a look at the explanation.", variant: "default", duration: 3500 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
@@ -226,16 +227,17 @@ export function KnowledgeQuizSession() {
         const updatedReviewItems = [...incorrectlyAnsweredQuestions];
         updatedReviewItems[currentReviewQuestionIndex] = {
             ...updatedReviewItems[currentReviewQuestionIndex],
-            answer: data.answer,
-            isCorrect: isCorrect,
-            explanation: explanationText,
-            imageSuggestion: imgSuggestion
+            answer: data.answer, // User's new answer during review
+            isCorrect: isCorrect, // Updated correctness
+            explanation: explanationText, // Updated explanation
+            imageSuggestion: imgSuggestion // Updated image suggestion
         };
         setIncorrectlyAnsweredQuestions(updatedReviewItems);
+        // Also update the main history if this question exists there
         const mainHistoryIndex = history.findIndex(h => h.question === updatedReviewItems[currentReviewQuestionIndex].question);
         if (mainHistoryIndex > -1) {
             const updatedHistory = [...history];
-            updatedHistory[mainHistoryIndex] = { ...updatedHistory[mainHistoryIndex], ...updatedReviewItems[currentReviewQuestionIndex]};
+            updatedHistory[mainHistoryIndex] = { ...updatedHistory[mainHistoryIndex], ...updatedReviewItems[currentReviewQuestionIndex]}; // update with new answer, isCorrect, explanation
             setHistory(updatedHistory);
         }
 
@@ -253,17 +255,20 @@ export function KnowledgeQuizSession() {
     setShowExplanationSection(false);
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
-    answerForm.reset();
+    answerForm.reset(); // Reset the answer form
 
     if (isReviewMode) {
         const nextIndex = currentReviewQuestionIndex + 1;
         if (nextIndex < incorrectlyAnsweredQuestions.length) {
             setCurrentReviewQuestionIndex(nextIndex);
             setCurrentQuestionText(incorrectlyAnsweredQuestions[nextIndex].question);
+            // Pre-fill with their previous incorrect answer for re-attempt
             answerForm.setValue('answer', incorrectlyAnsweredQuestions[nextIndex].answer || ''); 
             setCurrentStep('questioning');
         } else {
+            // Review finished
             setIsReviewMode(false);
+            // Potentially re-fetch summary if answers changed, or just go to summary
             fetchQuizSummary(topic, educationLevel, history); 
             toast({title: "Review Complete!", description: "You've reviewed all incorrect answers.", variant: "default"});
         }
@@ -273,16 +278,17 @@ export function KnowledgeQuizSession() {
   };
 
   const handleStartReview = () => {
+    // Filter for questions that are still marked incorrect in the main history
     const questionsToReview = history.filter(item => !item.isCorrect);
     if (questionsToReview.length > 0) {
         setIncorrectlyAnsweredQuestions(questionsToReview);
         setIsReviewMode(true);
         setCurrentReviewQuestionIndex(0);
         setCurrentQuestionText(questionsToReview[0].question);
-        answerForm.setValue('answer', questionsToReview[0].answer || '');
-        setCurrentExplanation(null);
-        setCurrentImageSuggestion(null);
-        setShowExplanationSection(false);
+        answerForm.setValue('answer', questionsToReview[0].answer || ''); // Pre-fill with their original incorrect answer
+        setCurrentExplanation(null); // Clear previous explanation
+        setCurrentImageSuggestion(null); // Clear previous image suggestion
+        setShowExplanationSection(false); // Hide explanation section for the new question
         setCurrentStep('questioning');
         toast({title: "Review Mode", description: "Let's go over the questions you missed.", variant: "default"});
     } else {
@@ -298,6 +304,7 @@ export function KnowledgeQuizSession() {
     setFurtherLearningSuggestions(null);
     setErrorMessage(null);
     setTopic("");
+    // educationLevel is reset by configForm.reset
     setIncorrectlyAnsweredQuestions([]);
     setIsReviewMode(false);
     setCurrentReviewQuestionIndex(0);
@@ -380,10 +387,20 @@ export function KnowledgeQuizSession() {
                 <FormField
                   control={configForm.control}
                   name="educationLevel"
-                  render={({ field }) => (
+                  render={({ field }) => {
+                    // Log current field value on each render for debugging
+                    // console.log('[EducationLevel Field] RENDER: field.value:', field.value, 'Type:', typeof field.value);
+                    return (
                     <FormItem>
                       <FormLabel className="text-lg">Education Level</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select
+                        onValueChange={(value) => {
+                          // console.log('[EducationLevel Select] ON_VALUE_CHANGE - selected value:', value, 'Type:', typeof value);
+                          field.onChange(value as EducationLevel);
+                          // console.log('[EducationLevel Select] RHF value after field.onChange:', configForm.getValues("educationLevel"));
+                        }}
+                        value={field.value} // Use value for controlled component
+                      >
                         <FormControl>
                           <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
                             <SelectValue placeholder="Select education level" />
@@ -399,7 +416,8 @@ export function KnowledgeQuizSession() {
                       </Select>
                       <FormMessage />
                     </FormItem>
-                  )}
+                    );
+                  }}
                 />
                 <Button type="submit" size="lg" className="w-full shadow-md" disabled={isLoading || isEvaluating}>
                   {isLoading || isEvaluating ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-1 h-5 w-5" />}
@@ -477,15 +495,16 @@ export function KnowledgeQuizSession() {
                     <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
                     <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
                     <AlertDescription className="text-green-700/90 dark:text-green-400/90">
-                        <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
                             {currentExplanation}
                         </ReactMarkdown>
                       {currentImageSuggestion && (
                         <div className="mt-1 p-1 border-t border-green-200 dark:border-green-700/30">
                             <p className="text-xs text-green-600 dark:text-green-400/80 mb-1 italic">Suggested image for clarity:</p>
+                             { console.log("Rendering image with suggestion:", currentImageSuggestion) }
                             <Image
                                 src={`https://placehold.co/300x200.png`}
-                                alt={currentImageSuggestion || "Visual aid"}
+                                alt={currentImageSuggestion || "Visual aid for explanation"}
                                 width={300}
                                 height={200}
                                 className="rounded shadow-md border border-green-300 dark:border-green-600"
@@ -562,7 +581,7 @@ export function KnowledgeQuizSession() {
                                   <div className="mt-1 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
                                     <p className="font-semibold text-green-700 dark:text-green-300">Explanation:</p>
                                     <div className="text-green-700/90 dark:text-green-400/90">
-                                      <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none">
+                                      <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
                                         {item.explanation}
                                       </ReactMarkdown>
                                     </div>
