@@ -2,7 +2,7 @@
 'use server';
 /**
  * @fileOverview An AI agent that evaluates a user's answer to a quiz question,
- * providing detailed explanations and suggesting images for clarity. Considers an optional PDF for context.
+ * providing a score (0-5), detailed explanations, and suggesting images for clarity. Considers an optional PDF for context.
  *
  * - evaluateAnswer - A function that handles the answer evaluation.
  * - EvaluateAnswerInput - The input type for the evaluateAnswer function.
@@ -24,8 +24,8 @@ const EvaluateAnswerInputSchema = z.object({
 export type EvaluateAnswerInput = z.infer<typeof EvaluateAnswerInputSchema>;
 
 const EvaluateAnswerOutputSchema = z.object({
-  isCorrect: z.boolean().describe('Whether the user answer is considered correct for the given question, topic, and education level.'),
-  explanation: z.string().describe('A detailed, teacher-like explanation for why the answer is correct or incorrect, tailored to the education level and specified language. This should always be provided and aim to help the student understand the underlying concept thoroughly. Provide the explanation in PLAIN TEXT, without Markdown formatting for bold, italics, or tables. Use natural language for structure.'),
+  awardedScore: z.number().min(0).max(5).describe('The score awarded to the user answer, on a scale of 0 to 5. 0: incorrect, 1-2: basic/partially correct, 3: mostly correct with minor issues, 4: very good, 5: excellent/fully comprehensive for the level.'),
+  explanation: z.string().describe('A detailed, teacher-like explanation for the score, tailored to the education level and specified language. This should always be provided and aim to help the student understand the underlying concept thoroughly. Provide the explanation in PLAIN TEXT, without Markdown formatting for bold, italics, or tables. Use natural language for structure.'),
   imageSuggestion: z.string().optional().describe("A one or two-word search term for an image that could visually clarify the explanation, if applicable. Max two words. E.g., 'photosynthesis diagram' or 'volcano eruption'.")
 });
 export type EvaluateAnswerOutput = z.infer<typeof EvaluateAnswerOutputSchema>;
@@ -39,9 +39,9 @@ const evaluateAnswerPrompt = ai.definePrompt({
   name: 'evaluateAnswerPrompt',
   input: {schema: EvaluateAnswerInputSchema},
   output: {schema: EvaluateAnswerOutputSchema},
-  prompt: `You are an expert AI educator evaluating a student's answer to a quiz question. Your goal is not just to mark it right or wrong, but to help the student truly understand the concept in their chosen language.
+  prompt: `You are an expert AI educator evaluating a student's answer to a quiz question. Your goal is to provide a fair score (0-5) and a comprehensive, teacher-like explanation to help the student understand the concept in their chosen language.
 {{#if pdfDataUri}}
-The student may have been referring to the following document for context. If the question or answer relates to it, ensure your evaluation and explanation are consistent with this document: {{media url=pdfDataUri}}.
+The student may have been referring to the following document for context. If the question or answer relates to it, ensure your evaluation, score, and explanation are consistent with this document: {{media url=pdfDataUri}}.
 {{/if}}
 
 Topic: {{{topic}}}
@@ -52,10 +52,17 @@ Question (this question was presented to the user in {{#if language}}{{language}
 User's Answer: {{{userAnswer}}}
 
 Please provide your response in {{#if language}}{{language}}{{else}}English{{/if}}.
-1.  \`isCorrect\`: A boolean indicating if the user's answer is substantially correct for the given question, topic, education level{{#if pdfDataUri}}, and the provided document context{{/if}}. Be reasonably flexible with phrasing if the core concept is correct. If the answer is too vague, or clearly wrong, mark it as incorrect.
+1.  \`awardedScore\`: An integer score from 0 to 5 based on the correctness and completeness of the user's answer relative to the question, topic, education level{{#if pdfDataUri}}, and provided document context{{/if}}.
+    *   0: Completely incorrect, irrelevant, or nonsensical.
+    *   1: Shows minimal understanding, perhaps a relevant keyword but fundamentally flawed or very incomplete.
+    *   2: Basic understanding, some correct points but significant inaccuracies or omissions.
+    *   3: Partially correct; understands the main concepts but has some inaccuracies or lacks depth/detail.
+    *   4: Mostly correct and well-understood; minor inaccuracies or could be slightly more detailed/clearer.
+    *   5: Fully correct, comprehensive for the education level, and clearly articulated.
 2.  \`explanation\`: A detailed, teacher-like explanation.
-    *   If correct: Explain *why* it's correct in {{#if language}}{{language}}{{else}}English{{/if}}, perhaps reinforcing the key concepts or adding a bit more relevant detail.
-    *   If incorrect: Clearly explain the misunderstanding or error in {{#if language}}{{language}}{{else}}English{{/if}}. Provide the correct information and explain the reasoning behind it.
+    *   Regardless of the score, explain the reasoning behind it in {{#if language}}{{language}}{{else}}English{{/if}}.
+    *   If the score is less than 5, clearly explain the misunderstanding, errors, or omissions. Provide the correct information and explain the reasoning behind it.
+    *   If the score is 5, reinforce why the answer is excellent, perhaps adding a bit more relevant detail or context.
     *   The explanation MUST be tailored to the student's specified education level and language ({{#if language}}{{language}}{{else}}English{{/if}}). It should help them understand the concept better. Use analogies or simpler terms if appropriate for the level and language.
     *   IMPORTANT: The explanation should be in **PLAIN TEXT** only. Do NOT use Markdown formatting like \`**bold**\`, \`*italics*\`, or table structures. Use natural language and paragraphs for clear separation of ideas.
 3.  \`imageSuggestion\`: If a simple image, diagram, or pictorial could significantly help in understanding the explanation (e.g., for visual concepts like a cell structure, a historical map, a type of rock), provide a one or two-word search term for such an image. Examples: "cell mitosis", "roman aqueduct", "igneous rock". If no image is particularly helpful, omit this field. Maximum two words. These terms should be in English or a broadly understandable format for image search.
@@ -72,14 +79,25 @@ const evaluateAnswerGenkitFlow = ai.defineFlow(
   },
   async (input: EvaluateAnswerInput) => {
     const {output} = await evaluateAnswerPrompt(input);
-    if (!output || typeof output.isCorrect !== 'boolean' || !output.explanation) {
+    if (!output || typeof output.awardedScore !== 'number' || !output.explanation) {
         console.error('AI output for evaluateAnswerFlow was invalid or incomplete:', output);
+        // Determine the language for the error message
+        const langForMessage = input.language || 'English';
+        let errorMessageText = `Could not determine the score or provide a detailed explanation in ${langForMessage} at this time. Please ensure your answer is clear.`;
+        if (langForMessage === 'Spanish') {
+          errorMessageText = `No se pudo determinar la puntuación ni proporcionar una explicación detallada en ${langForMessage} en este momento. Por favor, asegúrese de que su respuesta sea clara.`;
+        } else if (langForMessage === 'French') {
+          errorMessageText = `Impossible de déterminer le score ou de fournir une explication détaillée en ${langForMessage} pour le moment. Veuillez vous assurer que votre réponse est claire.`;
+        }
+        // Add more languages as needed
+
         return { 
-            isCorrect: false, 
-            explanation: `Could not determine correctness or provide a detailed explanation in ${input.language || 'English'} at this time. Please ensure your answer is clear.`,
+            awardedScore: 0, 
+            explanation: errorMessageText,
             imageSuggestion: undefined
         };
     }
     return output;
   }
 );
+
