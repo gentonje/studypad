@@ -152,6 +152,7 @@ export function KnowledgeQuizSession() {
     if (!currentQuestionText) return;
     setIsEvaluating(true);
     let isCorrect = false;
+    let explanation: string | undefined = "Let's keep trying!";
 
     try {
       const evalInput: EvaluateAnswerInput = {
@@ -162,10 +163,12 @@ export function KnowledgeQuizSession() {
       };
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
       isCorrect = evalOutput.isCorrect;
+      explanation = evalOutput.explanation || (isCorrect ? "Great job!" : "Let's keep trying!");
+
       if (isCorrect) {
-        toast({ title: "Correct!", description: evalOutput.explanation || "Great job!", variant: "default", duration: 2000 });
+        toast({ title: "Correct!", description: explanation, variant: "default", duration: 2000 });
       } else {
-        toast({ title: "Incorrect", description: evalOutput.explanation || "Let's keep trying!", variant: "destructive", duration: 2500 });
+        toast({ title: "Incorrect", description: explanation, variant: "destructive", duration: 2500 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
@@ -211,7 +214,7 @@ export function KnowledgeQuizSession() {
   if ((isLoading || isEvaluating) && currentStep !== 'questioning' && currentStep !== 'summary' && currentStep !== 'config' && currentStep !== 'error') {
     return (
       <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
-        <CardContent className="p-6 md:p-8 min-h-[300px] flex flex-col items-center justify-center text-center">
+        <CardContent className="p-4 sm:p-6 min-h-[300px] flex flex-col items-center justify-center text-center">
           <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
           <p className="text-lg text-muted-foreground">{getLoadingMessage()}</p>
         </CardContent>
@@ -222,12 +225,12 @@ export function KnowledgeQuizSession() {
   if (currentStep === 'error') {
     return (
       <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
-        <CardContent className="p-6 md:p-8 min-h-[300px] flex flex-col items-center justify-center">
+        <CardContent className="p-4 sm:p-6 min-h-[300px] flex flex-col items-center justify-center">
           <Alert variant="destructive" className="max-w-md mx-auto">
             <AlertTriangle className="h-5 w-5" />
             <AlertTitle>An Error Occurred</AlertTitle>
             <AlertDescription>{errorMessage || "Something went wrong. Please try again."}</AlertDescription>
-            <Button onClick={handleRestartQuiz} variant="outline" className="mt-4">
+            <Button onClick={handleRestartQuiz} variant="outline" className="mt-4 w-full sm:w-auto">
               <RefreshCw className="mr-2 h-4 w-4" /> Restart Quiz
             </Button>
           </Alert>
@@ -240,16 +243,16 @@ export function KnowledgeQuizSession() {
     <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
       {currentStep === 'config' && (
         <>
-          <CardHeader className="bg-muted/50 p-4 md:p-6 border-b">
+          <CardHeader className="bg-muted/50 p-4 sm:p-6 border-b">
             <div className="flex items-center gap-3">
               <BookOpen className="w-8 h-8 text-primary" />
               <div>
-                <CardTitle className="text-2xl">Configure Your Knowledge Quiz</CardTitle>
+                <CardTitle className="text-2xl">Configure Your Quiz</CardTitle>
                 <CardDescription>Tell us what you want to learn about.</CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-6 md:p-8">
+          <CardContent className="p-4 sm:p-6">
              <Form {...configForm}>
               <form onSubmit={configForm.handleSubmit(handleConfigSubmit)} className="space-y-6">
                 <FormField
@@ -259,7 +262,7 @@ export function KnowledgeQuizSession() {
                     <FormItem>
                       <FormLabel className="text-lg">Topic</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., 'Quantum Physics', 'Roman History'" {...field} className="text-base shadow-sm focus:ring-2 focus:ring-primary" />
+                        <Input placeholder="e.g., 'Quantum Physics'" {...field} className="text-base shadow-sm focus:ring-2 focus:ring-primary" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -301,28 +304,28 @@ export function KnowledgeQuizSession() {
 
       {currentStep === 'questioning' && currentQuestionText && (
         <>
-          <CardHeader className="bg-muted/50 p-4 md:p-6 border-b">
-             <CardTitle className="text-xl text-center md:text-left text-primary">Topic: {topic}</CardTitle>
-             <CardDescription className="text-center md:text-left">Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Question {history.length + 1}</CardDescription>
+          <CardHeader className="bg-muted/50 p-4 sm:p-6 border-b">
+             <CardTitle className="text-xl text-center sm:text-left text-primary">Topic: {topic}</CardTitle>
+             <CardDescription className="text-center sm:text-left">Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Question {history.length + 1}</CardDescription>
           </CardHeader>
           
           {history.length > 0 && (
-            <CardContent className="p-4 md:p-6 max-h-60">
+            <CardContent className="p-3 sm:p-4 max-h-60">
               <ScrollArea className="h-full pr-3">
-                <div className="space-y-4"> {/* Increased space-y for better separation */}
+                <div className="space-y-4">
                 <h3 className="text-md font-semibold text-muted-foreground mb-2">Previous Questions:</h3>
                 {history.map((item, index) => (
-                  <div key={index} className="text-sm p-3 rounded-md bg-muted/30 border border-border/70 shadow-sm">
+                  <div key={index} className="text-sm p-2 sm:p-3 rounded-md bg-muted/30 border border-border/70 shadow-sm">
                     <div className="flex items-start">
                       <MessageCircle className="w-4 h-4 mr-2 text-primary shrink-0 mt-[3px]"/>
                       <div className="flex-1">
-                        <span className="font-medium text-card-foreground">Question: </span>
                         <span className="font-medium text-card-foreground whitespace-pre-wrap">{item.question}</span>
                       </div>
-                      {item.isCorrect && <span className="ml-2 text-xl self-start">🎉</span>}
-                      {item.isCorrect === false && <span className="ml-2 text-xl self-start">🤔</span>}
+                      {typeof item.isCorrect === 'boolean' && (
+                        item.isCorrect ? <span className="ml-2 text-xl self-start">🎉</span> : <span className="ml-2 text-xl self-start">🤔</span>
+                      )}
                     </div>
-                    <p className="mt-2 text-muted-foreground pl-[calc(1rem+0.5rem)] whitespace-pre-wrap"> {/* 1rem for icon width + 0.5rem for margin = 22px; pl-6 is 24px. mt-2 for clear separation */}
+                    <p className="mt-1 sm:mt-2 text-muted-foreground pl-[calc(1rem+0.5rem)] whitespace-pre-wrap"> 
                       <span className="font-semibold">Your Answer: </span>{item.answer}
                     </p>
                   </div>
@@ -332,7 +335,7 @@ export function KnowledgeQuizSession() {
             </CardContent>
           )}
 
-          <CardContent className={`p-6 md:p-8 ${history.length > 0 ? 'pt-3' : ''}`}>
+          <CardContent className={`p-4 sm:p-6 ${history.length > 0 ? 'pt-2 sm:pt-3' : ''}`}>
             <Form {...answerForm}>
               <form onSubmit={answerForm.handleSubmit(handleAnswerSubmit)} className="space-y-6">
                 <FormField
@@ -340,7 +343,7 @@ export function KnowledgeQuizSession() {
                   name="answer"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xl font-medium text-card-foreground mb-3 block whitespace-pre-wrap">
+                      <FormLabel className="text-xl font-medium text-card-foreground mb-2 sm:mb-3 block whitespace-pre-wrap">
                         {currentQuestionText}
                       </FormLabel>
                       <FormControl>
@@ -356,7 +359,7 @@ export function KnowledgeQuizSession() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full md:w-auto shadow-md" disabled={isLoading || isEvaluating || answerForm.formState.isSubmitting}>
+                <Button type="submit" className="w-full sm:w-auto shadow-md" disabled={isLoading || isEvaluating || answerForm.formState.isSubmitting}>
                   {isLoading || isEvaluating || answerForm.formState.isSubmitting ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -367,7 +370,7 @@ export function KnowledgeQuizSession() {
               </form>
             </Form>
           </CardContent>
-          <CardFooter className="p-4 md:p-6 border-t bg-muted/50 flex justify-center">
+          <CardFooter className="p-4 sm:p-6 border-t bg-muted/50 flex justify-center">
             <Button variant="ghost" size="sm" onClick={handleRestartQuiz} className="text-muted-foreground hover:text-destructive" disabled={isLoading || isEvaluating}>
               Cancel Quiz
             </Button>
@@ -377,28 +380,29 @@ export function KnowledgeQuizSession() {
 
       {currentStep === 'summary' && (
         <>
-          <CardHeader className="bg-muted/50 p-4 md:p-6 border-b text-center">
+          <CardHeader className="bg-muted/50 p-4 sm:p-6 border-b text-center">
             <div className="flex items-center justify-center gap-3 mb-2">
                 <CheckCircle2 className="w-10 h-10 text-accent" />
                 <CardTitle className="text-2xl">Quiz Summary</CardTitle>
             </div>
             <CardDescription>Topic: {topic} | Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()}</CardDescription>
           </CardHeader>
-          <CardContent className="p-6 md:p-8 space-y-6">
+          <CardContent className="p-4 sm:p-6 space-y-6">
             {history.length > 0 && (
                 <Card className="bg-background/50 shadow-md">
-                    <CardHeader>
+                    <CardHeader className="p-3 sm:p-4">
                         <CardTitle className="text-lg text-primary flex items-center gap-2"><Check className="w-5 h-5"/>Your Answers:</CardTitle>
                     </CardHeader>
-                    <CardContent className="max-h-72">
+                    <CardContent className="max-h-72 p-3 sm:p-4">
                          <ScrollArea className="h-full pr-3">
                             <div className="space-y-3">
                             {history.map((item, index) => (
                             <div key={index} className="text-sm p-2 rounded-md bg-muted/30 border border-border/50">
                                 <div className="font-medium text-card-foreground flex items-start">
                                     <span className="mr-1 flex-1 whitespace-pre-wrap">{index+1}. {item.question}</span>
-                                    {item.isCorrect && <span className="ml-2 text-xl self-start">🎉</span>}
-                                    {item.isCorrect === false && <span className="ml-2 text-xl self-start">🤔</span>}
+                                    {typeof item.isCorrect === 'boolean' && (
+                                      item.isCorrect ? <span className="ml-2 text-xl self-start">🎉</span> : <span className="ml-2 text-xl self-start">🤔</span>
+                                    )}
                                 </div>
                                 <p className="text-xs text-muted-foreground pl-4 mt-1 whitespace-pre-wrap"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
                             </div>
@@ -410,20 +414,20 @@ export function KnowledgeQuizSession() {
             )}
             {summaryText && (
                 <Card className="bg-background/50 shadow-md">
-                <CardHeader>
+                <CardHeader className="p-3 sm:p-4">
                     <CardTitle className="text-xl text-primary flex items-center gap-2"><Lightbulb className="w-5 h-5"/>Main Summary</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-3 sm:p-4">
                     <p className="text-card-foreground whitespace-pre-wrap">{summaryText}</p>
                 </CardContent>
                 </Card>
             )}
             {furtherLearningSuggestions && furtherLearningSuggestions.length > 0 && (
                  <Card className="bg-background/50 shadow-md">
-                    <CardHeader>
+                    <CardHeader className="p-3 sm:p-4">
                         <CardTitle className="text-xl text-accent flex items-center gap-2"><BookOpen className="w-5 h-5"/>Further Learning</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-3 sm:p-4">
                         <ul className="list-disc pl-5 space-y-1 text-card-foreground">
                         {furtherLearningSuggestions.map((suggestion, index) => (
                             <li key={index} className="whitespace-pre-wrap">{suggestion}</li>
@@ -436,8 +440,8 @@ export function KnowledgeQuizSession() {
                 <p className="text-muted-foreground text-center">No summary or learning suggestions were generated for this session.</p>
             )}
           </CardContent>
-          <CardFooter className="p-4 md:p-6 border-t bg-muted/50 flex justify-center">
-            <Button onClick={handleRestartQuiz} variant="outline" className="w-full md:w-auto shadow-md">
+          <CardFooter className="p-4 sm:p-6 border-t bg-muted/50 flex justify-center">
+            <Button onClick={handleRestartQuiz} variant="outline" className="w-full sm:w-auto shadow-md">
                 <RefreshCw className="mr-2 h-4 w-4" /> Start New Quiz
             </Button>
           </CardFooter>
@@ -446,4 +450,3 @@ export function KnowledgeQuizSession() {
     </Card>
   );
 }
-

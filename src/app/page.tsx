@@ -32,8 +32,8 @@ const KnowledgeQuizAiLogo = () => (
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col items-center min-h-screen bg-background text-foreground p-4 md:p-8">
-      <header className="w-full max-w-3xl mb-8 text-center">
+    <div className="flex flex-col items-center min-h-screen bg-background text-foreground p-2 sm:p-4">
+      <header className="w-full max-w-md mx-auto mb-6 text-center">
         <div className="flex items-center justify-center gap-3 mb-3">
           <KnowledgeQuizAiLogo />
           <h1 className="text-3xl md:text-4xl font-bold text-primary">Knowledge Quiz AI</h1>
@@ -42,10 +42,10 @@ export default function HomePage() {
           Test your knowledge on any topic, at any level.
         </p>
       </header>
-      <main className="w-full max-w-3xl p-1">
+      <main className="w-full max-w-md mx-auto p-1">
         <KnowledgeQuizSession />
       </main>
-      <footer className="w-full max-w-3xl mt-12 text-center text-sm text-muted-foreground">
+      <footer className="w-full max-w-md mx-auto mt-10 text-center text-sm text-muted-foreground">
         <p>&copy; {new Date().getFullYear()} Knowledge Quiz AI. All rights reserved.</p>
         <p className="mt-1">
           This tool is for educational and informational purposes.
