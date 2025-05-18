@@ -19,7 +19,7 @@ const EvaluateAnswerInputSchema = z.object({
   topic: z.string().describe('The general topic of the quiz.'),
   educationLevel: EducationLevels.describe('The target education level for the quiz.'),
   language: SupportedLanguages.optional().describe('The language for the explanation. Defaults to English.'),
-  pdfDataUri: z.string().optional().describe("A PDF document provided by the user, as a data URI. Expected format: 'data:application/pdf;base64,<encoded_data>'."),
+  pdfDataUri: z.string().optional().nullable().describe("A PDF document provided by the user, as a data URI. Expected format: 'data:application/pdf;base64,<encoded_data>'."),
 });
 export type EvaluateAnswerInput = z.infer<typeof EvaluateAnswerInputSchema>;
 
@@ -31,6 +31,7 @@ const EvaluateAnswerOutputSchema = z.object({
 export type EvaluateAnswerOutput = z.infer<typeof EvaluateAnswerOutputSchema>;
 
 export async function evaluateAnswer(input: EvaluateAnswerInput): Promise<EvaluateAnswerOutput> {
+  console.log("evaluateAnswer: Input received:", JSON.stringify(input, null, 2));
   return evaluateAnswerGenkitFlow(input);
 }
 

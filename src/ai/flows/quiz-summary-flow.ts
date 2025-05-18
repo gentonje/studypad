@@ -19,7 +19,7 @@ const QuizSummaryInputSchema = z.object({
   topic: z.string().describe('The topic of the quiz.'),
   educationLevel: EducationLevels.describe('The education level for which the quiz was taken.'),
   language: SupportedLanguages.optional().describe('The language for the summary and suggestions. Defaults to English.'),
-  pdfDataUri: z.string().optional().describe("A PDF document provided by the user, as a data URI. Expected format: 'data:application/pdf;base64,<encoded_data>'."),
+  pdfDataUri: z.string().optional().nullable().describe("A PDF document provided by the user, as a data URI. Expected format: 'data:application/pdf;base64,<encoded_data>'."),
   responses: z
     .record(z.string())
     .describe('A record of question IDs (or truncated questions) to user responses.'),
@@ -40,6 +40,7 @@ const QuizSummaryOutputSchema = z.object({
 export type QuizSummaryOutput = z.infer<typeof QuizSummaryOutputSchema>;
 
 export async function getQuizSummary(input: QuizSummaryInput): Promise<QuizSummaryOutput> {
+  console.log("getQuizSummary: Input received:", JSON.stringify(input, null, 2));
   return quizSummaryFlow(input);
 }
 
@@ -109,4 +110,3 @@ const quizSummaryFlow = ai.defineFlow(
     return output;
   }
 );
-

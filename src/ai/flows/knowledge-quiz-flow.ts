@@ -17,7 +17,7 @@ const KnowledgeQuizInputSchema = z.object({
   topic: z.string().describe('The general topic for the quiz.'),
   educationLevel: EducationLevels.describe('The target education level for the questions.'),
   language: SupportedLanguages.optional().describe('The desired language for the quiz questions and content. Defaults to English if not provided.'),
-  pdfDataUri: z.string().optional().describe("A PDF document provided by the user, as a data URI. Expected format: 'data:application/pdf;base64,<encoded_data>'."),
+  pdfDataUri: z.string().optional().nullable().describe("A PDF document provided by the user, as a data URI. Expected format: 'data:application/pdf;base64,<encoded_data>'."),
   previousAnswers: z.array(z.object({
     question: z.string(),
     answer: z.string(),
@@ -32,13 +32,15 @@ const KnowledgeQuizOutputSchema = z.object({
 export type KnowledgeQuizOutput = z.infer<typeof KnowledgeQuizOutputSchema>;
 
 export async function knowledgeQuizFlow(input: KnowledgeQuizInput): Promise<KnowledgeQuizOutput> {
+  console.log("knowledgeQuizFlow: Input received:", JSON.stringify(input, null, 2));
   const flowOutput = await knowledgeQuizGenkitFlow(input);
   
   if (!flowOutput || typeof flowOutput.nextQuestion === 'undefined' || flowOutput.nextQuestion === null) {
+    console.log("knowledgeQuizFlow: AI signaled end of quiz (output undefined or null).");
     return { nextQuestion: "" }; 
   }
   if (typeof flowOutput.nextQuestion === 'string' && flowOutput.nextQuestion.trim() === '') {
-    // AI signaled end of quiz
+    console.log("knowledgeQuizFlow: AI signaled end of quiz (empty string).");
   } else if (typeof flowOutput.nextQuestion !== 'string') {
     console.error('knowledgeQuizFlow: AI output for nextQuestion was not a string:', flowOutput.nextQuestion, '- Forcing end of quiz.');
     return { nextQuestion: "" }; 
