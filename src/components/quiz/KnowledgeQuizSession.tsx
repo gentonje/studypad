@@ -11,6 +11,7 @@ import { knowledgeQuizFlow, type KnowledgeQuizInput, type KnowledgeQuizOutput } 
 import { getQuizSummary, type QuizSummaryInput, type QuizSummaryOutput } from '@/ai/flows/quiz-summary-flow';
 import { evaluateAnswer, type EvaluateAnswerInput, type EvaluateAnswerOutput } from '@/ai/flows/evaluate-answer-flow';
 import { EducationLevels, type EducationLevel } from '@/ai/flows/types';
+import ReactMarkdown from 'react-markdown';
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -79,7 +80,6 @@ export function KnowledgeQuizSession() {
   });
 
   useEffect(() => {
-    // Example of using educationLevel to adjust something, e.g., complexity (not implemented here)
     // console.log("KnowledgeQuizSession: Education level set to:", educationLevel);
   }, [educationLevel]);
 
@@ -97,7 +97,6 @@ export function KnowledgeQuizSession() {
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
-        // No initial question could be generated, go to summary/error
         setErrorMessage("Could not generate the first question for this topic/level. Please try another.");
         fetchQuizSummary(currentTopic, currentEducationLevel, []);
       }
@@ -136,7 +135,6 @@ export function KnowledgeQuizSession() {
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
-        // Main quiz round finished
         setIncorrectlyAnsweredQuestions(updatedHistory.filter(item => !item.isCorrect));
         fetchQuizSummary(currentTopic, currentEducationLevel, updatedHistory);
       }
@@ -167,7 +165,7 @@ export function KnowledgeQuizSession() {
       const output: QuizSummaryOutput = await getQuizSummary(input);
       setSummaryText(output.summary);
       setFurtherLearningSuggestions(output.furtherLearningSuggestions);
-      setIncorrectlyAnsweredQuestions(finalHistory.filter(item => !item.isCorrect)); // Update in case summary is called directly
+      setIncorrectlyAnsweredQuestions(finalHistory.filter(item => !item.isCorrect));
       setCurrentStep('summary');
       toast({ title: "Quiz Complete!", description: "Personalized summary generated.", variant: "default" });
     } catch (error) {
@@ -199,15 +197,14 @@ export function KnowledgeQuizSession() {
         educationLevel: educationLevel,
       };
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
-      console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); 
       isCorrect = evalOutput.isCorrect;
       explanationText = evalOutput.explanation || (isCorrect ? "Great job!" : "That's not quite right, let's look at why.");
       imgSuggestion = evalOutput.imageSuggestion;
 
       if (isCorrect) {
-        toast({ title: "Correct! 🎉", description: explanationText.substring(0, 100) + (explanationText.length > 100 ? "..." : ""), variant: "default", duration: 3000 });
+        toast({ title: "Correct! 🎉", description: evalOutput.explanation ? "See explanation below." : "Well done!", variant: "default", duration: 3000 });
       } else {
-        toast({ title: "Let's review 🤔", description: explanationText.substring(0,100) + (explanationText.length > 100 ? "..." : ""), variant: "default", duration: 3500 });
+        toast({ title: "Let's review 🤔", description: evalOutput.explanation ? "See explanation below." : "Take a look at the explanation.", variant: "default", duration: 3500 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
@@ -226,18 +223,22 @@ export function KnowledgeQuizSession() {
     };
 
     if (isReviewMode) {
-        // Logic for handling answers during review mode
-        // For now, we update the item in incorrectlyAnsweredQuestions array if the answer changes or evaluation result changes.
-        // This is a simplified approach; a more robust system might update a separate review history.
         const updatedReviewItems = [...incorrectlyAnsweredQuestions];
         updatedReviewItems[currentReviewQuestionIndex] = {
-            ...updatedReviewItems[currentReviewQuestionIndex], // Keep original question
-            answer: data.answer, // User's new answer
+            ...updatedReviewItems[currentReviewQuestionIndex],
+            answer: data.answer,
             isCorrect: isCorrect,
             explanation: explanationText,
             imageSuggestion: imgSuggestion
         };
         setIncorrectlyAnsweredQuestions(updatedReviewItems);
+        const mainHistoryIndex = history.findIndex(h => h.question === updatedReviewItems[currentReviewQuestionIndex].question);
+        if (mainHistoryIndex > -1) {
+            const updatedHistory = [...history];
+            updatedHistory[mainHistoryIndex] = { ...updatedHistory[mainHistoryIndex], ...updatedReviewItems[currentReviewQuestionIndex]};
+            setHistory(updatedHistory);
+        }
+
     } else {
         const updatedHistory = [...history, newHistoryItem];
         setHistory(updatedHistory);
@@ -259,16 +260,11 @@ export function KnowledgeQuizSession() {
         if (nextIndex < incorrectlyAnsweredQuestions.length) {
             setCurrentReviewQuestionIndex(nextIndex);
             setCurrentQuestionText(incorrectlyAnsweredQuestions[nextIndex].question);
-            // Clear previous answer from form for the new review question
             answerForm.setValue('answer', incorrectlyAnsweredQuestions[nextIndex].answer || ''); 
             setCurrentStep('questioning');
         } else {
-            // Review finished
             setIsReviewMode(false);
-            // Optionally, update the main history with corrected answers from the review
-            // For now, just go back to the summary view.
-            // We might want to re-fetch summary if review changes things significantly.
-            fetchQuizSummary(topic, educationLevel, history); // Re-fetch summary to reflect reviewed answers
+            fetchQuizSummary(topic, educationLevel, history); 
             toast({title: "Review Complete!", description: "You've reviewed all incorrect answers.", variant: "default"});
         }
     } else {
@@ -283,7 +279,6 @@ export function KnowledgeQuizSession() {
         setIsReviewMode(true);
         setCurrentReviewQuestionIndex(0);
         setCurrentQuestionText(questionsToReview[0].question);
-        // Pre-fill with their last (incorrect) answer to allow editing
         answerForm.setValue('answer', questionsToReview[0].answer || '');
         setCurrentExplanation(null);
         setCurrentImageSuggestion(null);
@@ -433,7 +428,7 @@ export function KnowledgeQuizSession() {
               <h3 className="text-md font-semibold text-muted-foreground mb-1 sticky top-0 bg-card z-10 py-1 px-1">Previous Questions:</h3>
               <div className="space-y-1 pt-1">
                 {history.map((item, index) => (
-                  <div key={`hist-${index}`} className="text-sm p-1 rounded-md bg-background/70 border border-border/70 shadow-sm">
+                  <div key={`hist-${index}-${item.question.substring(0,10)}`} className="text-sm p-1 rounded-md bg-background/70 border border-border/70 shadow-sm">
                     <div className="flex items-start space-x-1">
                       <MessageCircle className="w-4 h-4 mr-1 text-primary shrink-0 mt-[3px]"/>
                       <div className="flex-1">
@@ -481,9 +476,10 @@ export function KnowledgeQuizSession() {
                   <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/40 shadow-sm rounded-md p-1 my-1">
                     <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
                     <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
-                    <AlertDescription className="text-green-700/90 dark:text-green-400/90 whitespace-pre-wrap">
-                      {currentExplanation}
-                      {currentImageSuggestion && console.log("KnowledgeQuizSession: Rendering image with suggestion:", currentImageSuggestion)}
+                    <AlertDescription className="text-green-700/90 dark:text-green-400/90">
+                        <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none">
+                            {currentExplanation}
+                        </ReactMarkdown>
                       {currentImageSuggestion && (
                         <div className="mt-1 p-1 border-t border-green-200 dark:border-green-700/30">
                             <p className="text-xs text-green-600 dark:text-green-400/80 mb-1 italic">Suggested image for clarity:</p>
@@ -554,7 +550,7 @@ export function KnowledgeQuizSession() {
                          <ScrollArea className="h-full pr-1">
                             <div className="space-y-1">
                             {history.map((item, index) => (
-                            <div key={`summary-hist-${index}`} className="text-sm p-1 rounded-md bg-muted/30 border border-border/50 shadow-inner">
+                            <div key={`summary-hist-${index}-${item.question.substring(0,10)}`} className="text-sm p-1 rounded-md bg-muted/30 border border-border/50 shadow-inner">
                                 <div className="font-medium text-card-foreground flex items-start space-x-1">
                                     <span className="mr-1 flex-1 whitespace-pre-wrap">{index+1}. {item.question}</span>
                                     {typeof item.isCorrect === 'boolean' && (
@@ -565,7 +561,11 @@ export function KnowledgeQuizSession() {
                                 {item.explanation && (
                                   <div className="mt-1 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
                                     <p className="font-semibold text-green-700 dark:text-green-300">Explanation:</p>
-                                    <p className="text-green-700/90 dark:text-green-400/90 whitespace-pre-wrap">{item.explanation}</p>
+                                    <div className="text-green-700/90 dark:text-green-400/90">
+                                      <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none">
+                                        {item.explanation}
+                                      </ReactMarkdown>
+                                    </div>
                                     {item.imageSuggestion && (
                                         <div className="mt-1 pt-1 border-t border-green-200 dark:border-green-700/30">
                                              <Image
@@ -601,7 +601,11 @@ export function KnowledgeQuizSession() {
                     <CardTitle className="text-xl text-primary flex items-center space-x-1"><Lightbulb className="w-5 h-5 mr-1"/>Main Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="p-1">
-                    <p className="text-card-foreground whitespace-pre-wrap">{summaryText}</p>
+                    <div className="text-card-foreground whitespace-pre-wrap">
+                        <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none">
+                            {summaryText}
+                        </ReactMarkdown>
+                    </div>
                 </CardContent>
                 </Card>
             )}
@@ -620,7 +624,7 @@ export function KnowledgeQuizSession() {
                 </Card>
             )}
             {!summaryText && (!furtherLearningSuggestions || furtherLearningSuggestions.length === 0) && (
-                <p className="text-muted-foreground text-center">No summary or learning suggestions were generated for this session.</p>
+                <div className="text-muted-foreground text-center p-1">No summary or learning suggestions were generated for this session.</div>
             )}
             {incorrectlyAnsweredQuestions.length > 0 && !isReviewMode && (
                  <Card className="bg-orange-50 dark:bg-orange-900/30 shadow-md m-1 border-orange-300 dark:border-orange-700">

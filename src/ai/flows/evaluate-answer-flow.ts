@@ -23,7 +23,7 @@ export type EvaluateAnswerInput = z.infer<typeof EvaluateAnswerInputSchema>;
 
 const EvaluateAnswerOutputSchema = z.object({
   isCorrect: z.boolean().describe('Whether the user answer is considered correct for the given question, topic, and education level.'),
-  explanation: z.string().describe('A detailed, teacher-like explanation for why the answer is correct or incorrect, tailored to the education level. This should always be provided and aim to help the student understand the underlying concept thoroughly. The explanation should be in plain text, avoiding Markdown formatting for emphasis or tables.'),
+  explanation: z.string().describe('A detailed, teacher-like explanation for why the answer is correct or incorrect, tailored to the education level, formatted in Markdown. This should always be provided and aim to help the student understand the underlying concept thoroughly.'),
   imageSuggestion: z.string().optional().describe("A one or two-word search term for an image that could visually clarify the explanation, if applicable. Max two words. E.g., 'photosynthesis diagram' or 'volcano eruption'.")
 });
 export type EvaluateAnswerOutput = z.infer<typeof EvaluateAnswerOutputSchema>;
@@ -50,10 +50,16 @@ Please provide:
     *   If correct: Explain *why* it's correct, perhaps reinforcing the key concepts or adding a bit more relevant detail.
     *   If incorrect: Clearly explain the misunderstanding or error. Provide the correct information and explain the reasoning behind it.
     *   The explanation MUST be tailored to the student's specified education level and should help them understand the concept better. Use analogies or simpler terms if appropriate for the level.
-    *   IMPORTANT: The explanation must be in **plain text**. Do NOT use Markdown syntax (like **, _, #, or | for tables). Use paragraphs and simple bullet points (like - or *) if needed for structure.
+    *   IMPORTANT: The explanation should be formatted using **Markdown** to enhance readability and structure. You can use elements like:
+        *   Headings (e.g., \`## Key Concept\`, \`### Details\`)
+        *   Bold (\`**important term**\`) and italics (\`*emphasis*\`)
+        *   Bullet points (using \`*\`, \`-\`, or \`+\`) for lists
+        *   Numbered lists
+        *   Paragraphs for clear separation of ideas.
+        Avoid overly complex Markdown or HTML. The goal is a clear, teacher-like explanation.
 3.  \`imageSuggestion\`: If a simple image, diagram, or pictorial could significantly help in understanding the explanation (e.g., for visual concepts like a cell structure, a historical map, a type of rock), provide a one or two-word search term for such an image. Examples: "cell mitosis", "roman aqueduct", "igneous rock". If no image is particularly helpful, omit this field. Maximum two words.
 
-Ensure your output strictly adheres to the requested JSON format and that the explanation is thorough, pedagogical, and in plain text.
+Ensure your output strictly adheres to the requested JSON format and that the explanation is thorough, pedagogical, and formatted in Markdown.
 `,
 });
 
@@ -76,4 +82,3 @@ const evaluateAnswerGenkitFlow = ai.defineFlow(
     return output;
   }
 );
-
