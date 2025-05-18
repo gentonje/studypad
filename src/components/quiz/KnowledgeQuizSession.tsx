@@ -248,6 +248,7 @@ export function KnowledgeQuizSession() {
 
     setCurrentExplanation(explanationText);
     setCurrentImageSuggestion(imgSuggestion || null);
+    // console.log("KnowledgeQuizSession: AI Evaluation Output:", { isCorrect, explanationText, imgSuggestion });
     setShowExplanationSection(true);
   };
 
@@ -393,8 +394,10 @@ export function KnowledgeQuizSession() {
                       <Select
                         onValueChange={(value) => {
                           field.onChange(value as EducationLevel);
+                          // console.log("KnowledgeQuizSession: Education Level Select onChange:", value);
                         }}
                         value={field.value}
+                        // defaultValue={field.value} // Using value instead of defaultValue for controlled component
                       >
                         <FormControl>
                           <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
@@ -446,9 +449,9 @@ export function KnowledgeQuizSession() {
                       <div className="flex-1">
                         <span className="font-medium text-card-foreground whitespace-pre-wrap">{item.question}</span>
                       </div>
-                      {typeof item.isCorrect === 'boolean' && (
+                      {typeof item.isCorrect === 'boolean' ? (
                         item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <span className="ml-1 text-xl self-start">🤔</span>
-                      )}
+                      ) : <span className="ml-1 text-xl self-start">🤔</span>}
                     </div>
                     <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap">
                       <span className="font-semibold">Your Answer: </span>{item.answer}
@@ -489,13 +492,13 @@ export function KnowledgeQuizSession() {
                     <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
                     <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
                     <AlertDescription className="text-green-700/90 dark:text-green-400/90">
-                        <ReactMarkdown className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-2">
+                        <ReactMarkdown className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1">
                             {currentExplanation}
                         </ReactMarkdown>
                       {currentImageSuggestion && (
                         <div className="mt-1 p-1 border-t border-green-200 dark:border-green-700/30">
                             <p className="text-xs text-green-600 dark:text-green-400/80 mb-1 italic">Suggested image for clarity:</p>
-                             {/* console.log("Rendering image with suggestion:", currentImageSuggestion) */}
+                             {/* console.log("Rendering image with suggestion:", currentImageSuggestion); */}
                             <Image
                                 src={`https://placehold.co/300x200.png`}
                                 alt={currentImageSuggestion || "Visual aid for explanation"}
@@ -566,16 +569,16 @@ export function KnowledgeQuizSession() {
                             <div key={`summary-hist-${index}-${item.question.substring(0,10)}`} className="text-sm p-1 rounded-md bg-muted/30 border border-border/50 shadow-inner">
                                 <div className="font-medium text-card-foreground flex items-start space-x-1">
                                     <span className="mr-1 flex-1 whitespace-pre-wrap">{index+1}. {item.question}</span>
-                                    {typeof item.isCorrect === 'boolean' && (
+                                    {typeof item.isCorrect === 'boolean' ? (
                                       item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <span className="ml-1 text-xl self-start">🤔</span>
-                                    )}
+                                    ) : <span className="ml-1 text-xl self-start">🤔</span> }
                                 </div>
                                 <p className="text-xs text-muted-foreground pl-1 mt-1 whitespace-pre-wrap"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
                                 {item.explanation && (
                                   <div className="mt-1 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
                                     <p className="font-semibold text-green-700 dark:text-green-300">Explanation:</p>
                                     <div className="text-green-700/90 dark:text-green-400/90">
-                                      <ReactMarkdown className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-2">
+                                      <ReactMarkdown className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1">
                                         {item.explanation}
                                       </ReactMarkdown>
                                     </div>
@@ -615,7 +618,7 @@ export function KnowledgeQuizSession() {
                 </CardHeader>
                 <CardContent className="p-1">
                     <div className="text-card-foreground whitespace-pre-wrap">
-                        <ReactMarkdown className="prose dark:prose-invert max-w-none prose-p:my-2">
+                        <ReactMarkdown className="prose dark:prose-invert max-w-none prose-p:my-1">
                             {summaryText}
                         </ReactMarkdown>
                     </div>
