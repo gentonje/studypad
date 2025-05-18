@@ -22,7 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check, ArrowRight, Image as ImageIcon, ExternalLink, ThumbsUp, Languages, FileText, XCircle, Home } from 'lucide-react';
+import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check, ArrowRight, Image as ImageIcon, ExternalLink, ThumbsUp, Languages, FileText, XCircle, Home, Bot } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const readFileAsDataURI = (file: File): Promise<string> => {
@@ -52,11 +52,17 @@ interface HistoryItem {
   isCorrect?: boolean;
   explanation?: string;
   imageSuggestion?: string;
+  awardedPoints?: number;
+  possiblePoints?: number;
 }
 
 interface KnowledgeQuizSessionProps {
   onGoToHome?: () => void;
 }
+
+const POINTS_FOR_CORRECT_ANSWER = 5;
+const POINTS_FOR_INCORRECT_ANSWER = 0;
+const MAX_POINTS_PER_QUESTION = 5;
 
 export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) {
   const [currentStep, setCurrentStep] = useState<'config' | 'questioning' | 'summary' | 'loading' | 'error'>('config');
@@ -82,6 +88,10 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   const [currentExplanation, setCurrentExplanation] = useState<string | null>(null);
   const [currentImageSuggestion, setCurrentImageSuggestion] = useState<string | null>(null);
   const [showExplanationSection, setShowExplanationSection] = useState(false);
+  const [currentAwardedPoints, setCurrentAwardedPoints] = useState<number | null>(null);
+
+  const [currentUserScore, setCurrentUserScore] = useState(0);
+  const [currentTotalPossibleScore, setCurrentTotalPossibleScore] = useState(0);
 
 
   const { toast } = useToast();
@@ -112,6 +122,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setShowExplanationSection(false);
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
+    setCurrentAwardedPoints(null);
     try {
       const input: KnowledgeQuizInput = { 
         previousAnswers: [], 
@@ -149,6 +160,8 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setIsReviewMode(false);
     setCurrentReviewQuestionIndex(0);
     setErrorMessage(null);
+    setCurrentUserScore(0);
+    setCurrentTotalPossibleScore(0);
     
     let generatedPdfDataUri: string | null = null;
     if (pdfFile) {
@@ -183,6 +196,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setShowExplanationSection(false);
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
+    setCurrentAwardedPoints(null);
     try {
       const input: KnowledgeQuizInput = { 
         previousAnswers: updatedHistory.map(h => ({question: h.question, answer: h.answer})), 
@@ -219,6 +233,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setShowExplanationSection(false);
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
+    setCurrentAwardedPoints(null);
     try {
       const responses = finalHistory.reduce((acc, item, index) => {
         acc[`q${index}_${item.question.substring(0,15).replace(/\s/g,'_')}`] = item.answer;
@@ -256,6 +271,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setShowExplanationSection(false);
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
+    setCurrentAwardedPoints(null);
     setErrorMessage(null);
     
     const formConfig = configForm.getValues(); 
@@ -264,6 +280,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     let isCorrectUserAnswer = false; 
     let explanationText = "Could not retrieve explanation for this answer.";
     let imgSuggestion: string | undefined = undefined;
+    let awardedPointsForThisQuestion = POINTS_FOR_INCORRECT_ANSWER;
 
     try {
       const evalInput: EvaluateAnswerInput = {
@@ -274,17 +291,19 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         language: formConfig.language,
         pdfDataUri: configPdfDataUri, 
       };
+      console.log("KnowledgeQuizSession: Input to evaluateAnswer:", JSON.stringify(evalInput, null, 2));
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
-      console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); 
+      console.log("KnowledgeQuizSession: AI Evaluation Output:", JSON.stringify(evalOutput, null, 2)); 
       
       isCorrectUserAnswer = evalOutput.isCorrect;
       explanationText = evalOutput.explanation || (isCorrectUserAnswer ? "Great job!" : "That's not quite right, let's look at why.");
       imgSuggestion = evalOutput.imageSuggestion;
 
       if (isCorrectUserAnswer) {
-        toast({ icon: <ThumbsUp className="text-green-500 mr-1" />, title: "Correct! 🎉", description: "See explanation below.", variant: "default", duration: 3000 });
+        awardedPointsForThisQuestion = POINTS_FOR_CORRECT_ANSWER;
+        toast({ icon: <ThumbsUp className="text-green-500 mr-1" />, title: "Correct! 🎉", description: evalOutput.explanation ? "See explanation below." : "Well done!", variant: "default", duration: 3000 });
       } else {
-        toast({ icon: <span className="text-xl mr-1">🤔</span>, title: "Let's review", description: "See explanation below.", variant: "default", duration: 3500 });
+        toast({ icon: <Bot className="text-blue-500 mr-1" />, title: "Let's review", description: evalOutput.explanation ? "See explanation below." : "Let's see the details.", variant: "default", duration: 3500 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
@@ -295,12 +314,18 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       setIsEvaluating(false);
     }
 
+    setCurrentUserScore(prevScore => prevScore + awardedPointsForThisQuestion);
+    setCurrentTotalPossibleScore(prevTotal => prevTotal + MAX_POINTS_PER_QUESTION);
+    setCurrentAwardedPoints(awardedPointsForThisQuestion);
+
     const newHistoryItem: HistoryItem = {
         question: currentQuestionText,
         answer: data.answer,
         isCorrect: isCorrectUserAnswer,
         explanation: explanationText,
-        imageSuggestion: imgSuggestion
+        imageSuggestion: imgSuggestion,
+        awardedPoints: awardedPointsForThisQuestion,
+        possiblePoints: MAX_POINTS_PER_QUESTION,
     };
 
     if (isReviewMode) {
@@ -311,14 +336,26 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
             answer: data.answer, 
             isCorrect: isCorrectUserAnswer, 
             explanation: explanationText, 
-            imageSuggestion: imgSuggestion 
+            imageSuggestion: imgSuggestion,
+            awardedPoints: awardedPointsForThisQuestion, // Re-score in review mode too? Or keep original attempt's score? For now, re-score.
+            possiblePoints: MAX_POINTS_PER_QUESTION,
         };
         setIncorrectlyAnsweredQuestions(updatedReviewItems);
         
         const mainHistoryIndex = history.findIndex(h => h.question === originalQuestionToUpdate.question);
         if (mainHistoryIndex > -1) {
             const updatedMainHistory = [...history];
-            updatedMainHistory[mainHistoryIndex] = { ...updatedMainHistory[mainHistoryIndex], ...updatedReviewItems[currentReviewQuestionIndex]}; 
+            // When reviewing, we generally don't update the main history's score, but the review history.
+            // For now, let's assume review mode updates a separate log or we just update the review list.
+            // Let's update the main history item's 'answer' and 'explanation' if they re-attempt.
+            updatedMainHistory[mainHistoryIndex] = { 
+                ...updatedMainHistory[mainHistoryIndex], 
+                answer: data.answer, // Store their new answer during review
+                explanation: explanationText, // Store new explanation
+                // isCorrect and awardedPoints from the original attempt are usually preserved
+                // or handled by a separate "reviewAttempt" field if needed.
+                // For this iteration, we'll update the review list primarily.
+            }; 
             setHistory(updatedMainHistory);
         }
     } else {
@@ -335,6 +372,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setShowExplanationSection(false);
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
+    setCurrentAwardedPoints(null);
     answerForm.reset(); 
     setErrorMessage(null);
     
@@ -358,9 +396,10 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   };
 
   const handleStartReview = () => {
+    // Use the 'history' directly to find incorrect answers, as 'incorrectlyAnsweredQuestions' might be from a previous summary.
     const questionsToReview = history.filter(item => item.isCorrect === false);
     if (questionsToReview.length > 0) {
-        setIncorrectlyAnsweredQuestions(questionsToReview);
+        setIncorrectlyAnsweredQuestions(questionsToReview); // This will be the list for the current review session
         setIsReviewMode(true);
         setCurrentReviewQuestionIndex(0);
         setCurrentQuestionText(questionsToReview[0].question);
@@ -368,6 +407,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setCurrentExplanation(null); 
         setCurrentImageSuggestion(null); 
         setShowExplanationSection(false); 
+        setCurrentAwardedPoints(null);
         setCurrentStep('questioning');
         setErrorMessage(null);
         toast({title: "Review Mode", description: "Let's go over the questions you missed.", variant: "default"});
@@ -380,7 +420,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     if (onGoToHome) {
       onGoToHome();
     } else {
-      // Fallback if onGoToHome is not provided (e.g. direct navigation to quiz page)
       setCurrentStep('config');
       setCurrentQuestionText(null);
       setHistory([]);
@@ -396,6 +435,11 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       setIncorrectlyAnsweredQuestions([]);
       setIsReviewMode(false);
       setCurrentReviewQuestionIndex(0);
+
+      setCurrentUserScore(0);
+      setCurrentTotalPossibleScore(0);
+      setCurrentAwardedPoints(null);
+
       configForm.reset(); 
       answerForm.reset();
       setIsLoading(false);
@@ -502,15 +546,16 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                   control={configForm.control}
                   name="educationLevel"
                   render={({ field }) => {
+                    // console.log("[EducationLevel Field Render] field.value:", field.value); // For debugging dropdown
                     return (
                       <FormItem>
                         <FormLabel className="text-lg">Education Level</FormLabel>
                         <Select
                           onValueChange={(value) => {
-                            console.log("[EducationLevel Select onValueChange] selected value:", value);
+                            // console.log("[EducationLevel Select onValueChange] selected value:", value); // For debugging dropdown
                             field.onChange(value as EducationLevel);
                           }}
-                          value={field.value}
+                          value={field.value} 
                         >
                           <FormControl>
                             <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
@@ -635,8 +680,8 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
           </CardHeader>
 
            {history.length > 0 && !showExplanationSection && !isReviewMode && (
-            <CardContent className="p-1 max-h-60 overflow-y-auto bg-muted/20">
-              <h3 className="text-md font-semibold text-muted-foreground mb-1 sticky top-0 bg-card z-10 py-1 px-1">Previous Questions:</h3>
+            <CardContent className="p-1 max-h-60 overflow-y-auto bg-muted/20 sticky top-0 bg-card z-10 py-1 px-1">
+              <h3 className="text-md font-semibold text-muted-foreground mb-1">Previous Questions:</h3>
               <div className="space-y-1 pt-1">
                 {history.map((item, index) => (
                   <div key={`hist-${index}-${item.question.substring(0,10)}`} className="text-sm p-1 rounded-md bg-background/70 border border-border/70 shadow-sm">
@@ -647,7 +692,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                       </div>
                        {typeof item.isCorrect === 'boolean' ? (
                         item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <XCircle className="ml-1 text-destructive w-4 h-4 self-start" />
-                      ) : <MessageCircle className="ml-1 text-muted-foreground w-4 h-4 self-start" /> }
+                      ) : <Bot className="ml-1 text-muted-foreground w-4 h-4 self-start" /> }
                     </div>
                     <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap prose prose-p:my-1">
                       <span className="font-semibold">Your Answer: </span>{item.answer}
@@ -687,6 +732,11 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                   <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/40 shadow-sm rounded-md p-1 my-1">
                     <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
                     <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
+                     {currentAwardedPoints !== null && (
+                        <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
+                            Score: {currentAwardedPoints}/{MAX_POINTS_PER_QUESTION}
+                        </p>
+                    )}
                     <AlertDescription className="text-green-700/90 dark:text-green-400/90">
                         <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1">
                             <ReactMarkdown>{currentExplanation}</ReactMarkdown>
@@ -694,6 +744,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                       {currentImageSuggestion && (
                         <div className="mt-1 p-1 border-t border-green-200 dark:border-green-700/30">
                             <p className="text-xs text-green-600 dark:text-green-400/80 mb-1 italic">Suggested image for clarity:</p>
+                             {/* console.log("KnowledgeQuizSession: Rendering image with suggestion:", currentImageSuggestion); */}
                             <Image
                                 src={`https://placehold.co/300x200.png`}
                                 alt={currentImageSuggestion || "Visual aid for explanation"}
@@ -750,6 +801,9 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                 <CheckCircle2 className="w-10 h-10 text-accent mr-1" />
                 <CardTitle className="text-2xl">Quiz Summary</CardTitle>
             </div>
+             <div className="font-semibold text-lg text-primary">
+                Final Score: {currentUserScore} / {currentTotalPossibleScore}
+             </div>
             <div className="flex justify-center items-center space-x-1">
                 <CardDescription>
                     Topic: <span className="font-semibold">{formValuesForHeader.topic}</span> 
@@ -797,6 +851,9 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                                     ) : <MessageCircle className="ml-1 text-muted-foreground w-4 h-4 self-start" /> }
                                 </div>
                                 <p className="text-xs text-muted-foreground pl-1 mt-1 whitespace-pre-wrap prose prose-p:my-1"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
+                                {typeof item.awardedPoints === 'number' && typeof item.possiblePoints === 'number' && (
+                                    <p className="text-xs font-medium text-primary pl-1">Score: {item.awardedPoints}/{item.possiblePoints}</p>
+                                )}
                                 {item.explanation && (
                                   <div className="mt-1 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
                                     <p className="font-semibold text-green-700 dark:text-green-300">Explanation:</p>
@@ -897,3 +954,4 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     </Card>
   );
 }
+
