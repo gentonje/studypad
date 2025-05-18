@@ -79,9 +79,9 @@ export function KnowledgeQuizSession() {
     },
   });
 
-  useEffect(() => {
-    // console.log("KnowledgeQuizSession: Education level from component state:", educationLevel);
-  }, [educationLevel]);
+  // useEffect(() => {
+  //   // console.log("KnowledgeQuizSession: Education level from component state:", educationLevel);
+  // }, [educationLevel]);
 
   const fetchInitialQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel) => {
     setIsLoading(true);
@@ -197,15 +197,15 @@ export function KnowledgeQuizSession() {
         educationLevel: educationLevel,
       };
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
-      // console.log("AI Evaluation Output:", evalOutput); 
+      console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); 
       isCorrect = evalOutput.isCorrect;
       explanationText = evalOutput.explanation || (isCorrect ? "Great job!" : "That's not quite right, let's look at why.");
       imgSuggestion = evalOutput.imageSuggestion;
 
       if (isCorrect) {
-        toast({ icon: <ThumbsUp className="text-green-500" />, title: "Correct! 🎉", description: evalOutput.explanation ? "See explanation below." : "Well done!", variant: "default", duration: 3000 });
+        toast({ icon: <ThumbsUp className="text-green-500" />, title: "Correct! 🎉", description: explanationText ? "See explanation below." : "Well done!", variant: "default", duration: 3000 });
       } else {
-        toast({ icon: <span className="text-xl">🤔</span>, title: "Let's review", description: evalOutput.explanation ? "See explanation below." : "Take a look at the explanation.", variant: "default", duration: 3500 });
+        toast({ icon: <span className="text-xl">🤔</span>, title: "Let's review", description: explanationText ? "See explanation below." : "Take a look at the explanation.", variant: "default", duration: 3500 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
@@ -248,7 +248,6 @@ export function KnowledgeQuizSession() {
 
     setCurrentExplanation(explanationText);
     setCurrentImageSuggestion(imgSuggestion || null);
-    // console.log("KnowledgeQuizSession: AI Evaluation Output:", { isCorrect, explanationText, imgSuggestion });
     setShowExplanationSection(true);
   };
 
@@ -388,33 +387,36 @@ export function KnowledgeQuizSession() {
                 <FormField
                   control={configForm.control}
                   name="educationLevel"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-lg">Education Level</FormLabel>
-                      <Select
-                        onValueChange={(value) => {
-                          field.onChange(value as EducationLevel);
-                          // console.log("KnowledgeQuizSession: Education Level Select onChange:", value);
-                        }}
-                        value={field.value}
-                        // defaultValue={field.value} // Using value instead of defaultValue for controlled component
-                      >
-                        <FormControl>
-                          <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
-                            <SelectValue placeholder="Select education level" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {EducationLevels.options.map((level) => (
-                            <SelectItem key={level} value={level} className="text-base">
-                              {level.replace(/([A-Z])/g, ' $1').trim()}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    console.log('[EducationLevel Field Render] field.value:', field.value);
+                    return (
+                      <FormItem>
+                        <FormLabel className="text-lg">Education Level</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            console.log('[EducationLevel Select onValueChange] selected value:', value);
+                            field.onChange(value as EducationLevel);
+                            console.log('[EducationLevel Select onValueChange] called field.onChange with:', value);
+                          }}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
+                              <SelectValue placeholder="Select education level" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {EducationLevels.options.map((level) => (
+                              <SelectItem key={level} value={level} className="text-base">
+                                {level.replace(/([A-Z])/g, ' $1').trim()}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
                 <Button type="submit" size="lg" className="w-full shadow-md" disabled={isLoading || isEvaluating}>
                   {isLoading || isEvaluating ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-1 h-5 w-5" />}
