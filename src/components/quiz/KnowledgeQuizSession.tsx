@@ -64,10 +64,10 @@ export function KnowledgeQuizSession() {
   const [furtherLearningSuggestions, setFurtherLearningSuggestions] = useState<string[] | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
-  // Configuration state
-  const [topic, setTopic] = useState<string>("");
-  const [educationLevel, setEducationLevel] = useState<EducationLevel>("HighSchool");
-  const [language, setLanguage] = useState<SupportedLanguage>("English");
+  const [topic, setTopic] = useState<string>(""); // Retained for header display, form holds source of truth
+  const [educationLevel, setEducationLevel] = useState<EducationLevel>("HighSchool"); // Retained for header display
+  const [language, setLanguage] = useState<SupportedLanguage>("English"); // Retained for header display
+
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [configPdfDataUri, setConfigPdfDataUri] = useState<string | null>(null);
 
@@ -97,24 +97,21 @@ export function KnowledgeQuizSession() {
     },
   });
 
-  // Effect to log educationLevel from form state when it changes
-  useEffect(() => {
-    const subscription = configForm.watch((value, { name, type }) => {
-      if (name === 'educationLevel') {
-        // console.log('[EducationLevel Form Watch] New educationLevel:', value.educationLevel);
-        // You could also directly setEducationLevel(value.educationLevel as EducationLevel) here
-        // if you want the separate educationLevel state to always mirror the form's state.
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [configForm.watch]);
+  // useEffect(() => {
+  //   const subscription = configForm.watch((value, { name, type }) => {
+  //     if (name === 'educationLevel') {
+  //       // console.log('[EducationLevel Form Watch] New educationLevel:', value.educationLevel);
+  //     }
+  //   });
+  //   return () => subscription.unsubscribe();
+  // }, [configForm.watch]);
 
 
   const fetchInitialQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, currentPdfDataUri: string | null) => {
+    console.log("KnowledgeQuizSession: Fetching initial question with params:", { currentTopic, currentEducationLevel, currentLanguage, pdfPresent: !!currentPdfDataUri });
     setIsLoading(true);
     setCurrentStep('loading');
-    // setErrorMessage should be set before calling, if needed for PDF processing, or cleared here
-    if (!errorMessage?.startsWith("Processing PDF...")) { // Don't clear PDF processing message
+    if (!errorMessage?.startsWith("Processing PDF...")) {
         setErrorMessage(null);
     }
     setShowExplanationSection(false);
@@ -128,32 +125,37 @@ export function KnowledgeQuizSession() {
         language: currentLanguage,
         pdfDataUri: currentPdfDataUri 
       };
+      console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow (initial):", input);
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
-        setErrorMessage("Could not generate the first question for this topic/level/language/PDF. Please try another combination.");
+        setErrorMessage(`Could not generate the first question for this topic/level${currentPdfDataUri ? '/PDF' : ''}. Please try another combination or check the PDF content.`);
+        // Proceed to summary even if no questions were asked, as per existing logic.
         fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, [], currentPdfDataUri);
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching initial question:", error);
-      setErrorMessage("Sorry, I couldn't start the quiz for that topic. Please try configuring again.");
+      const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
+      setErrorMessage(`Sorry, I couldn't start the quiz: ${errorMsg}. Please try configuring again.`);
       setCurrentStep('error');
-      toast({ title: "Error", description: "Failed to start quiz.", variant: "destructive" });
+      toast({ title: "Quiz Start Error", description: `Failed to start quiz: ${errorMsg}`, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleConfigSubmit: SubmitHandler<ConfigFormData> = async (data) => {
-    setTopic(data.topic);
-    setEducationLevel(data.educationLevel); // This state is mainly for display in headers now
-    setLanguage(data.language); // This state is also for display/passing if not directly from form
+    console.log("KnowledgeQuizSession: Config form submitted with data:", data);
+    setTopic(data.topic); // For header display
+    setEducationLevel(data.educationLevel); // For header display
+    setLanguage(data.language); // For header display
     setHistory([]);
     setIncorrectlyAnsweredQuestions([]);
     setIsReviewMode(false);
     setCurrentReviewQuestionIndex(0);
+    setErrorMessage(null);
     
     let generatedPdfDataUri: string | null = null;
     if (pdfFile) {
@@ -161,27 +163,29 @@ export function KnowledgeQuizSession() {
       setCurrentStep('loading');
       setErrorMessage("Processing PDF..."); 
       try {
+        console.log("KnowledgeQuizSession: Reading PDF file:", pdfFile.name);
         generatedPdfDataUri = await readFileAsDataURI(pdfFile);
-        setConfigPdfDataUri(generatedPdfDataUri); // Store for later use in other flows
-        // setErrorMessage(null); // Cleared by fetchInitialQuestion or if it sets its own error
+        setConfigPdfDataUri(generatedPdfDataUri); 
         toast({ title: "PDF Processed", description: `${pdfFile.name} will be used for context.`, variant: "default" });
+        setErrorMessage(null); // Clear PDF processing message
       } catch (error) {
-        console.error("Error reading PDF file:", error);
-        toast({ title: "PDF Error", description: "Could not read PDF file. Continuing without it.", variant: "destructive" });
-        setErrorMessage("Could not process the PDF. Continuing without it.");
+        console.error("KnowledgeQuizSession: Error reading PDF file:", error);
+        const errorMsg = error instanceof Error ? error.message : "Could not read file";
+        toast({ title: "PDF Error", description: `${errorMsg}. Continuing without PDF.`, variant: "destructive" });
+        setErrorMessage(`Could not process PDF: ${errorMsg}. Continuing without it.`);
         setConfigPdfDataUri(null); 
-        setPdfFile(null); 
+        setPdfFile(null); // Clear the invalid file
       }
-      // setIsLoading(false) will be handled by fetchInitialQuestion's finally block
+      // setIsLoading(false) handled by fetchInitialQuestion's finally
     } else {
-        setConfigPdfDataUri(null); // Ensure it's null if no file was selected or if cleared
+        setConfigPdfDataUri(null); 
     }
-    // Pass the freshly generated (or null) URI and form data to fetchInitialQuestion
-    // The form data (data.topic, data.educationLevel, data.language) is the source of truth for the quiz config
+    
     fetchInitialQuestion(data.topic, data.educationLevel, data.language, generatedPdfDataUri);
   };
 
   const fetchNextQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, updatedHistory: HistoryItem[], currentPdfDataUri: string | null) => {
+    console.log("KnowledgeQuizSession: Fetching next question with params:", { currentTopic, currentEducationLevel, currentLanguage, historyLength: updatedHistory.length, pdfPresent: !!currentPdfDataUri });
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null);
@@ -191,31 +195,34 @@ export function KnowledgeQuizSession() {
     try {
       const input: KnowledgeQuizInput = { 
         previousAnswers: updatedHistory.map(h => ({question: h.question, answer: h.answer})), 
-        topic: currentTopic,  // Use topic from form submit
-        educationLevel: currentEducationLevel, // Use educationLevel from form submit
-        language: currentLanguage, // Use language from form submit
+        topic: currentTopic,
+        educationLevel: currentEducationLevel,
+        language: currentLanguage,
         pdfDataUri: currentPdfDataUri, 
       };
+      console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow (next):", input);
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
 
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
-        setIncorrectlyAnsweredQuestions(updatedHistory.filter(item => !item.isCorrect));
+        setIncorrectlyAnsweredQuestions(updatedHistory.filter(item => item.isCorrect === false)); // Only strictly incorrect
         fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, updatedHistory, currentPdfDataUri); 
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching next question:", error);
-      setErrorMessage("Sorry, I couldn't get the next question. You can try to get the summary or restart.");
+      const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
+      setErrorMessage(`Sorry, I couldn't get the next question: ${errorMsg}. You can try to get the summary or restart.`);
       setCurrentStep('error');
-      toast({ title: "Error", description: "Failed to get next question.", variant: "destructive" });
+      toast({ title: "Next Question Error", description: `Failed to get next question: ${errorMsg}`, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
 
   const fetchQuizSummary = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, finalHistory: HistoryItem[], currentPdfDataUri: string | null) => {
+    console.log("KnowledgeQuizSession: Fetching quiz summary with params:", { currentTopic, currentEducationLevel, currentLanguage, historyLength: finalHistory.length, pdfPresent: !!currentPdfDataUri });
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null);
@@ -229,24 +236,26 @@ export function KnowledgeQuizSession() {
       }, {} as Record<string, string>);
 
       const input: QuizSummaryInput = { 
-        topic: currentTopic, // Use topic from form submit
-        educationLevel: currentEducationLevel, // Use educationLevel from form submit
-        language: currentLanguage, // Use language from form submit
+        topic: currentTopic, 
+        educationLevel: currentEducationLevel, 
+        language: currentLanguage, 
         pdfDataUri: currentPdfDataUri, 
         responses, 
-        conversationHistory: finalHistory.map(h => ({question: h.question, answer: h.answer})) 
+        conversationHistory: finalHistory 
       };
+      console.log("KnowledgeQuizSession: Input to getQuizSummary:", input);
       const output: QuizSummaryOutput = await getQuizSummary(input);
       setSummaryText(output.summary);
       setFurtherLearningSuggestions(output.furtherLearningSuggestions);
-      setIncorrectlyAnsweredQuestions(finalHistory.filter(item => !item.isCorrect));
+      setIncorrectlyAnsweredQuestions(finalHistory.filter(item => item.isCorrect === false)); // Only strictly incorrect
       setCurrentStep('summary');
       toast({ title: "Quiz Complete!", description: "Personalized summary generated.", variant: "default" });
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching quiz summary:", error);
-      setErrorMessage("Sorry, I couldn't generate your quiz summary. Please try again or restart.");
+      const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
+      setErrorMessage(`Sorry, I couldn't generate your quiz summary: ${errorMsg}. Please try again or restart.`);
       setCurrentStep('error');
-      toast({ title: "Error", description: "Failed to generate summary.", variant: "destructive" });
+      toast({ title: "Summary Error", description: `Failed to generate summary: ${errorMsg}`, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -258,15 +267,16 @@ export function KnowledgeQuizSession() {
     setShowExplanationSection(false);
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
-    // console.log("KnowledgeQuizSession: handleAnswerSubmit called for question:", currentQuestionText, "Answer:", data.answer);
+    setErrorMessage(null);
+    
+    const formConfig = configForm.getValues(); 
+    console.log("KnowledgeQuizSession: Handling answer submit for question:", currentQuestionText, "Answer:", data.answer, "Config:", formConfig);
 
     let isCorrectUserAnswer = false; 
     let explanationText = "Could not retrieve explanation for this answer.";
     let imgSuggestion: string | undefined = undefined;
 
     try {
-      // Values from configForm are the source of truth for topic, educationLevel, language
-      const formConfig = configForm.getValues(); 
       const evalInput: EvaluateAnswerInput = {
         question: currentQuestionText,
         userAnswer: data.answer,
@@ -275,22 +285,24 @@ export function KnowledgeQuizSession() {
         language: formConfig.language,
         pdfDataUri: configPdfDataUri, 
       };
-      // console.log("KnowledgeQuizSession: AI Evaluation Input:", evalInput);
+      console.log("KnowledgeQuizSession: Input to evaluateAnswer:", evalInput);
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
-      // console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); 
+      console.log("KnowledgeQuizSession: Output from evaluateAnswer:", evalOutput); 
+      
       isCorrectUserAnswer = evalOutput.isCorrect;
       explanationText = evalOutput.explanation || (isCorrectUserAnswer ? "Great job!" : "That's not quite right, let's look at why.");
       imgSuggestion = evalOutput.imageSuggestion;
 
       if (isCorrectUserAnswer) {
-        toast({ icon: <ThumbsUp className="text-green-500" />, title: "Correct! 🎉", description: explanationText ? "See explanation below." : "Well done!", variant: "default", duration: 3000 });
+        toast({ icon: <ThumbsUp className="text-green-500 mr-1" />, title: "Correct! 🎉", description: "See explanation below.", variant: "default", duration: 3000 });
       } else {
-        toast({ icon: <span className="text-xl">🤔</span>, title: "Let's review", description: explanationText ? "See explanation below." : "Take a look at the explanation.", variant: "default", duration: 3500 });
+        toast({ icon: <span className="text-xl mr-1">🤔</span>, title: "Let's review", description: "See explanation below.", variant: "default", duration: 3500 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
-      explanationText = "An error occurred while evaluating your answer.";
-      toast({ title: "Evaluation Error", description: "Couldn't evaluate answer. See explanation section.", variant: "destructive", duration: 2000 });
+      const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
+      explanationText = `An error occurred while evaluating your answer: ${errorMsg}`;
+      toast({ title: "Evaluation Error", description: `Couldn't evaluate answer: ${errorMsg}. See explanation section.`, variant: "destructive", duration: 2000 });
     } finally {
       setIsEvaluating(false);
     }
@@ -305,19 +317,22 @@ export function KnowledgeQuizSession() {
 
     if (isReviewMode) {
         const updatedReviewItems = [...incorrectlyAnsweredQuestions];
+        const originalQuestionToUpdate = updatedReviewItems[currentReviewQuestionIndex];
         updatedReviewItems[currentReviewQuestionIndex] = {
-            ...updatedReviewItems[currentReviewQuestionIndex],
-            answer: data.answer, 
+            ...originalQuestionToUpdate, // Keep original question
+            answer: data.answer, // Update with new answer attempt
             isCorrect: isCorrectUserAnswer, 
             explanation: explanationText, 
             imageSuggestion: imgSuggestion 
         };
         setIncorrectlyAnsweredQuestions(updatedReviewItems);
-        const mainHistoryIndex = history.findIndex(h => h.question === updatedReviewItems[currentReviewQuestionIndex].question);
+        
+        // Also update the main history
+        const mainHistoryIndex = history.findIndex(h => h.question === originalQuestionToUpdate.question);
         if (mainHistoryIndex > -1) {
-            const updatedHistory = [...history];
-            updatedHistory[mainHistoryIndex] = { ...updatedHistory[mainHistoryIndex], ...updatedReviewItems[currentReviewQuestionIndex]}; 
-            setHistory(updatedHistory);
+            const updatedMainHistory = [...history];
+            updatedMainHistory[mainHistoryIndex] = { ...updatedMainHistory[mainHistoryIndex], ...updatedReviewItems[currentReviewQuestionIndex]}; 
+            setHistory(updatedMainHistory);
         }
     } else {
         const updatedHistory = [...history, newHistoryItem];
@@ -334,8 +349,9 @@ export function KnowledgeQuizSession() {
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
     answerForm.reset(); 
+    setErrorMessage(null);
     
-    const formConfig = configForm.getValues(); // Get latest config from form
+    const formConfig = configForm.getValues(); 
 
     if (isReviewMode) {
         const nextIndex = currentReviewQuestionIndex + 1;
@@ -346,6 +362,7 @@ export function KnowledgeQuizSession() {
             setCurrentStep('questioning');
         } else {
             setIsReviewMode(false);
+            // After review, go to summary again, this time it will show reviewed answers
             fetchQuizSummary(formConfig.topic, formConfig.educationLevel, formConfig.language, history, configPdfDataUri); 
             toast({title: "Review Complete!", description: "You've reviewed all incorrect answers.", variant: "default"});
         }
@@ -355,17 +372,20 @@ export function KnowledgeQuizSession() {
   };
 
   const handleStartReview = () => {
-    const questionsToReview = history.filter(item => !item.isCorrect);
+    // Use the main history to filter for incorrect questions to ensure explanations are up-to-date
+    const questionsToReview = history.filter(item => item.isCorrect === false);
     if (questionsToReview.length > 0) {
         setIncorrectlyAnsweredQuestions(questionsToReview);
         setIsReviewMode(true);
         setCurrentReviewQuestionIndex(0);
         setCurrentQuestionText(questionsToReview[0].question);
-        answerForm.setValue('answer', questionsToReview[0].answer || ''); 
+        // Do not pre-fill answer in review mode, user should re-attempt
+        answerForm.reset(); 
         setCurrentExplanation(null); 
         setCurrentImageSuggestion(null); 
         setShowExplanationSection(false); 
         setCurrentStep('questioning');
+        setErrorMessage(null);
         toast({title: "Review Mode", description: "Let's go over the questions you missed.", variant: "default"});
     } else {
         toast({title: "No Incorrect Answers", description: "Great job! Nothing to review.", variant: "default"});
@@ -379,16 +399,16 @@ export function KnowledgeQuizSession() {
     setSummaryText(null);
     setFurtherLearningSuggestions(null);
     setErrorMessage(null);
-    // setTopic(""); // No longer needed, configForm handles this
-    // setEducationLevel("HighSchool"); // No longer needed
-    // setLanguage("English"); // No longer needed
-    
+        
     setPdfFile(null);
     setConfigPdfDataUri(null);
+    const fileInput = document.getElementById('pdf-upload-input') as HTMLInputElement | null;
+    if (fileInput) fileInput.value = "";
+
     setIncorrectlyAnsweredQuestions([]);
     setIsReviewMode(false);
     setCurrentReviewQuestionIndex(0);
-    configForm.reset(); // Resets to defaultValues specified in useForm
+    configForm.reset(); 
     answerForm.reset();
     setIsLoading(false);
     setIsEvaluating(false);
@@ -402,17 +422,18 @@ export function KnowledgeQuizSession() {
     setConfigPdfDataUri(null); 
     const fileInput = document.getElementById('pdf-upload-input') as HTMLInputElement | null;
     if (fileInput) {
-        fileInput.value = ""; // Attempt to clear the native file input
+        fileInput.value = ""; 
     }
     toast({ title: "PDF Cleared", description: "The selected PDF has been removed.", variant: "default" });
   };
 
   const getLoadingMessage = () => {
-    if (errorMessage && errorMessage.startsWith("Processing PDF...")) return errorMessage;
+    if (errorMessage && errorMessage.startsWith("Processing PDF...")) return errorMessage; // Keep this specific message
     if (isEvaluating && !showExplanationSection) return "Evaluating your answer...";
     if (currentStep === 'loading') {
         if (!currentQuestionText && !summaryText && history.length === 0 && !isReviewMode) return "Preparing your quiz...";
-        if (currentQuestionText && !summaryText) return "Getting next question...";
+        if (currentQuestionText && !summaryText && !isReviewMode) return "Getting next question...";
+        if (isReviewMode && !summaryText) return "Preparing review question...";
         if (summaryText === null && history.length > 0 && !isReviewMode) return "Generating your summary...";
     }
     return "Loading...";
@@ -427,27 +448,36 @@ export function KnowledgeQuizSession() {
         <CardContent className="p-1 min-h-[300px] flex flex-col items-center justify-center text-center">
           <Loader2 className="w-12 h-12 text-primary animate-spin mb-1" />
           <p className="text-lg text-muted-foreground">{getLoadingMessage()}</p>
+          {errorMessage && errorMessage.startsWith("Processing PDF...") && (
+             <p className="text-sm text-destructive mt-1">{errorMessage}</p>
+          )}
         </CardContent>
+      </Card>
+    );
+  }
+  
+  if (errorMessage && currentStep !== 'loading' && !errorMessage.startsWith("Processing PDF...")) { // Show general error if not a loading message
+    return (
+      <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
+        <CardHeader className="bg-muted/50 p-1 border-b">
+          <CardTitle className="text-xl text-destructive flex items-center"><AlertTriangle className="mr-1"/> Error</CardTitle>
+        </CardHeader>
+        <CardContent className="p-1 min-h-[200px] flex flex-col items-center justify-center">
+          <Alert variant="destructive" className="mx-auto">
+            <AlertTriangle className="h-5 w-5" />
+            <AlertTitle>An Error Occurred</AlertTitle>
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        </CardContent>
+        <CardFooter className="p-1 border-t bg-muted/50 flex justify-center">
+            <Button onClick={handleRestartQuiz} variant="outline" className="w-full sm:w-auto">
+              <RefreshCw className="mr-1 h-4 w-4" /> Restart Quiz
+            </Button>
+        </CardFooter>
       </Card>
     );
   }
 
-  if (currentStep === 'error') {
-    return (
-      <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
-        <CardContent className="p-1 min-h-[300px] flex flex-col items-center justify-center">
-          <Alert variant="destructive" className="max-w-md mx-auto">
-            <AlertTriangle className="h-5 w-5" />
-            <AlertTitle>An Error Occurred</AlertTitle>
-            <AlertDescription>{errorMessage || "Something went wrong. Please try again."}</AlertDescription>
-            <Button onClick={handleRestartQuiz} variant="outline" className="mt-1 w-full sm:w-auto">
-              <RefreshCw className="mr-1 h-4 w-4" /> Restart Quiz
-            </Button>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
@@ -482,16 +512,14 @@ export function KnowledgeQuizSession() {
                   control={configForm.control}
                   name="educationLevel"
                   render={({ field }) => {
-                    // console.log('[EducationLevel Field Render] field.value:', field.value);
                     return (
                       <FormItem>
                         <FormLabel className="text-lg">Education Level</FormLabel>
                         <Select
                           onValueChange={(value) => {
-                            // console.log('[EducationLevel Select onValueChange] selected value:', value);
                             field.onChange(value as EducationLevel);
                           }}
-                          value={field.value} // Use value for controlled component
+                          value={field.value} 
                         >
                           <FormControl>
                             <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
@@ -517,7 +545,7 @@ export function KnowledgeQuizSession() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-lg">Language</FormLabel>
-                      <Select
+                       <Select
                         onValueChange={(value) => field.onChange(value as SupportedLanguage)}
                         value={field.value}
                       >
@@ -557,8 +585,8 @@ export function KnowledgeQuizSession() {
                       </Button>
                     )}
                   </div>
-                  {pdfFile && <FormDescription id="pdf-description">Selected: {pdfFile.name}</FormDescription>}
-                  {!pdfFile && <FormDescription id="pdf-description">Upload a PDF to base the quiz on its content.</FormDescription>}
+                  {pdfFile && <FormDescription id="pdf-description" className="text-xs">Selected: {pdfFile.name}</FormDescription>}
+                  {!pdfFile && <FormDescription id="pdf-description" className="text-xs">Upload a PDF to base the quiz on its content.</FormDescription>}
                   <FormMessage />
                 </FormItem>
                 <Button type="submit" size="lg" className="w-full shadow-md" disabled={isLoading || isEvaluating}>
@@ -575,9 +603,11 @@ export function KnowledgeQuizSession() {
         <>
           <CardHeader className="bg-muted/50 p-1 border-b">
              <CardTitle className="text-xl text-center sm:text-left text-primary">
-                {isReviewMode ? "Reviewing: " : "Topic: "}{formValuesForHeader.topic} {configPdfDataUri && <FileText className="inline h-5 w-5 ml-1 align-middle" title="PDF Context Active"/>}
+                {isReviewMode ? "Reviewing: " : "Topic: "}
+                <span className="font-semibold">{formValuesForHeader.topic}</span>
+                {configPdfDataUri && <FileText className="inline h-5 w-5 ml-1 align-middle text-muted-foreground" title="PDF Context Active"/>}
              </CardTitle>
-             <CardDescription className="text-center sm:text-left">
+             <CardDescription className="text-center sm:text-left text-xs">
                 Level: {formValuesForHeader.educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {formValuesForHeader.language} |
                 {isReviewMode ? ` Review Question ${currentReviewQuestionIndex + 1} of ${incorrectlyAnsweredQuestions.length}` : ` Question ${history.length + (showExplanationSection ? 0 : 1)}`}
              </CardDescription>
@@ -598,7 +628,7 @@ export function KnowledgeQuizSession() {
                         item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <span className="ml-1 text-xl self-start">🤔</span>
                       ) : <span className="ml-1 text-xl self-start">🤔</span>}
                     </div>
-                    <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap prose prose-sm prose-p:my-1">
+                    <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap prose prose-p:my-1">
                       <span className="font-semibold">Your Answer: </span>{item.answer}
                     </p>
                   </div>
@@ -698,7 +728,7 @@ export function KnowledgeQuizSession() {
                 <CheckCircle2 className="w-10 h-10 text-accent mr-1" />
                 <CardTitle className="text-2xl">Quiz Summary</CardTitle>
             </div>
-            <CardDescription>Topic: {formValuesForHeader.topic} {configPdfDataUri && <FileText className="inline h-4 w-4 ml-1 align-middle" title="PDF Context Active"/>} | Level: {formValuesForHeader.educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {formValuesForHeader.language}</CardDescription>
+            <CardDescription>Topic: <span className="font-semibold">{formValuesForHeader.topic}</span> {configPdfDataUri && <FileText className="inline h-4 w-4 ml-1 align-middle text-muted-foreground" title="PDF Context Active"/>} | Level: {formValuesForHeader.educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {formValuesForHeader.language}</CardDescription>
           </CardHeader>
           <CardContent className="p-1 space-y-1">
             {history.length > 0 && (
