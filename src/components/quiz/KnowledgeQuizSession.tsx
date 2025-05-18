@@ -177,11 +177,10 @@ export function KnowledgeQuizSession() {
       isCorrect = evalOutput.isCorrect;
       explanationText = evalOutput.explanation || (isCorrect ? "Great job!" : "That's not quite right, let's look at why.");
 
-      // Toast notification can remain or be enhanced
       if (isCorrect) {
-        toast({ title: "Correct!", description: "View explanation below.", variant: "default", duration: 2000 });
+        toast({ title: "Correct!", description: explanationText, variant: "default", duration: 3000 });
       } else {
-        toast({ title: "Check Explanation", description: "See details below.", variant: "default", duration: 2500 });
+        toast({ title: "Check Explanation", description: explanationText, variant: "default", duration: 3500 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
@@ -194,7 +193,6 @@ export function KnowledgeQuizSession() {
     const newHistoryItem: HistoryItem = { question: currentQuestionText, answer: data.answer, isCorrect, explanation: explanationText };
     const updatedHistory = [...history, newHistoryItem];
     setHistory(updatedHistory);
-    // Do NOT reset answerForm or fetchNextQuestion here. User needs to see explanation first.
     
     setCurrentExplanation(explanationText);
     setShowExplanationSection(true);
@@ -203,8 +201,8 @@ export function KnowledgeQuizSession() {
   const handleProceedToNextQuestion = () => {
     setShowExplanationSection(false);
     setCurrentExplanation(null);
-    answerForm.reset(); // Reset form for the new question
-    fetchNextQuestion(topic, educationLevel, history); // 'history' is already updated from handleAnswerSubmit
+    answerForm.reset(); 
+    fetchNextQuestion(topic, educationLevel, history); 
   };
   
   const handleRestartQuiz = () => {
@@ -331,7 +329,7 @@ export function KnowledgeQuizSession() {
              <CardDescription className="text-center sm:text-left">Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Question {history.length + (showExplanationSection ? 0 : 1)}</CardDescription>
           </CardHeader>
           
-          {history.length > 0 && !showExplanationSection && ( // Only show history if not showing current explanation
+          {history.length > 0 && !showExplanationSection && ( 
             <CardContent className="p-3 sm:p-4 max-h-60">
               <ScrollArea className="h-full pr-3">
                 <div className="space-y-4">
@@ -357,7 +355,8 @@ export function KnowledgeQuizSession() {
             </CardContent>
           )}
 
-          <CardContent className={`p-4 sm:p-6 ${history.length > 0 && !showExplanationSection ? 'pt-2 sm:pt-3' : ''}`}>
+          {/* Ensure consistent padding for the current question section */}
+          <CardContent className="p-4 sm:p-6">
             <Form {...answerForm}>
               <form onSubmit={answerForm.handleSubmit(handleAnswerSubmit)} className="space-y-6">
                 <FormField
@@ -496,4 +495,5 @@ export function KnowledgeQuizSession() {
     </Card>
   );
 }
+
 
