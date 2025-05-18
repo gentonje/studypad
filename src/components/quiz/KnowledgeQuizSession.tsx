@@ -197,7 +197,7 @@ export function KnowledgeQuizSession() {
         educationLevel: educationLevel,
       };
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
-      console.log("AI Evaluation Output:", evalOutput); // Log the AI output
+      // console.log("AI Evaluation Output:", evalOutput); 
       isCorrect = evalOutput.isCorrect;
       explanationText = evalOutput.explanation || (isCorrect ? "Great job!" : "That's not quite right, let's look at why.");
       imgSuggestion = evalOutput.imageSuggestion;
@@ -387,19 +387,14 @@ export function KnowledgeQuizSession() {
                 <FormField
                   control={configForm.control}
                   name="educationLevel"
-                  render={({ field }) => {
-                    // Log current field value on each render for debugging
-                    // console.log('[EducationLevel Field] RENDER: field.value:', field.value, 'Type:', typeof field.value);
-                    return (
+                  render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-lg">Education Level</FormLabel>
                       <Select
                         onValueChange={(value) => {
-                          // console.log('[EducationLevel Select] ON_VALUE_CHANGE - selected value:', value, 'Type:', typeof value);
                           field.onChange(value as EducationLevel);
-                          // console.log('[EducationLevel Select] RHF value after field.onChange:', configForm.getValues("educationLevel"));
                         }}
-                        value={field.value} // Use value for controlled component
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
@@ -416,8 +411,7 @@ export function KnowledgeQuizSession() {
                       </Select>
                       <FormMessage />
                     </FormItem>
-                    );
-                  }}
+                  )}
                 />
                 <Button type="submit" size="lg" className="w-full shadow-md" disabled={isLoading || isEvaluating}>
                   {isLoading || isEvaluating ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-1 h-5 w-5" />}
@@ -495,13 +489,13 @@ export function KnowledgeQuizSession() {
                     <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
                     <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
                     <AlertDescription className="text-green-700/90 dark:text-green-400/90">
-                        <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+                        <ReactMarkdown className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-2">
                             {currentExplanation}
                         </ReactMarkdown>
                       {currentImageSuggestion && (
                         <div className="mt-1 p-1 border-t border-green-200 dark:border-green-700/30">
                             <p className="text-xs text-green-600 dark:text-green-400/80 mb-1 italic">Suggested image for clarity:</p>
-                             { console.log("Rendering image with suggestion:", currentImageSuggestion) }
+                             {/* console.log("Rendering image with suggestion:", currentImageSuggestion) */}
                             <Image
                                 src={`https://placehold.co/300x200.png`}
                                 alt={currentImageSuggestion || "Visual aid for explanation"}
@@ -581,7 +575,7 @@ export function KnowledgeQuizSession() {
                                   <div className="mt-1 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
                                     <p className="font-semibold text-green-700 dark:text-green-300">Explanation:</p>
                                     <div className="text-green-700/90 dark:text-green-400/90">
-                                      <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
+                                      <ReactMarkdown className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-2">
                                         {item.explanation}
                                       </ReactMarkdown>
                                     </div>
@@ -621,7 +615,7 @@ export function KnowledgeQuizSession() {
                 </CardHeader>
                 <CardContent className="p-1">
                     <div className="text-card-foreground whitespace-pre-wrap">
-                        <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown className="prose dark:prose-invert max-w-none prose-p:my-2">
                             {summaryText}
                         </ReactMarkdown>
                     </div>
@@ -642,7 +636,7 @@ export function KnowledgeQuizSession() {
                     </CardContent>
                 </Card>
             )}
-            {!summaryText && (!furtherLearningSuggestions || furtherLearningSuggestions.length === 0) && (
+            {(!summaryText && (!furtherLearningSuggestions || furtherLearningSuggestions.length === 0)) && history.length > 0 && (
                 <div className="text-muted-foreground text-center p-1">No summary or learning suggestions were generated for this session.</div>
             )}
             {incorrectlyAnsweredQuestions.length > 0 && !isReviewMode && (
