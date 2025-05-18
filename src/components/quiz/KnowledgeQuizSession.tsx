@@ -10,7 +10,7 @@ import { z } from "zod";
 import { knowledgeQuizFlow, type KnowledgeQuizInput, type KnowledgeQuizOutput } from '@/ai/flows/knowledge-quiz-flow';
 import { getQuizSummary, type QuizSummaryInput, type QuizSummaryOutput } from '@/ai/flows/quiz-summary-flow';
 import { evaluateAnswer, type EvaluateAnswerInput, type EvaluateAnswerOutput } from '@/ai/flows/evaluate-answer-flow';
-import { EducationLevels, type EducationLevel } from '@/ai/flows/types';
+import { EducationLevels, SupportedLanguages, type EducationLevel, type SupportedLanguage } from '@/ai/flows/types';
 import ReactMarkdown from 'react-markdown';
 
 import { Button } from "@/components/ui/button";
@@ -21,12 +21,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check, ArrowRight, Image as ImageIcon, ExternalLink, ThumbsUp } from 'lucide-react';
+import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check, ArrowRight, Image as ImageIcon, ExternalLink, ThumbsUp, Languages } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const configFormSchema = z.object({
   topic: z.string().min(3, { message: "Topic must be at least 3 characters." }).max(100, {message: "Topic is too long."}),
   educationLevel: EducationLevels,
+  language: SupportedLanguages,
 });
 type ConfigFormData = z.infer<typeof configFormSchema>;
 
@@ -55,6 +56,7 @@ export function KnowledgeQuizSession() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [topic, setTopic] = useState<string>("");
   const [educationLevel, setEducationLevel] = useState<EducationLevel>("HighSchool");
+  const [language, setLanguage] = useState<SupportedLanguage>("English");
   const [isLoading, setIsLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [currentExplanation, setCurrentExplanation] = useState<string | null>(null);
@@ -69,6 +71,7 @@ export function KnowledgeQuizSession() {
     defaultValues: {
       topic: "",
       educationLevel: "HighSchool",
+      language: "English",
     },
   });
 
@@ -79,11 +82,7 @@ export function KnowledgeQuizSession() {
     },
   });
 
-  // useEffect(() => {
-  //   // console.log("KnowledgeQuizSession: Education level from component state:", educationLevel);
-  // }, [educationLevel]);
-
-  const fetchInitialQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel) => {
+  const fetchInitialQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage) => {
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null);
@@ -91,14 +90,14 @@ export function KnowledgeQuizSession() {
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
     try {
-      const input: KnowledgeQuizInput = { previousAnswers: [], topic: currentTopic, educationLevel: currentEducationLevel };
+      const input: KnowledgeQuizInput = { previousAnswers: [], topic: currentTopic, educationLevel: currentEducationLevel, language: currentLanguage };
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
-        setErrorMessage("Could not generate the first question for this topic/level. Please try another.");
-        fetchQuizSummary(currentTopic, currentEducationLevel, []);
+        setErrorMessage("Could not generate the first question for this topic/level/language. Please try another combination.");
+        fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, []);
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching initial question:", error);
@@ -113,14 +112,15 @@ export function KnowledgeQuizSession() {
   const handleConfigSubmit: SubmitHandler<ConfigFormData> = (data) => {
     setTopic(data.topic);
     setEducationLevel(data.educationLevel);
+    setLanguage(data.language);
     setHistory([]);
     setIncorrectlyAnsweredQuestions([]);
     setIsReviewMode(false);
     setCurrentReviewQuestionIndex(0);
-    fetchInitialQuestion(data.topic, data.educationLevel);
+    fetchInitialQuestion(data.topic, data.educationLevel, data.language);
   };
 
-  const fetchNextQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, updatedHistory: HistoryItem[]) => {
+  const fetchNextQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, updatedHistory: HistoryItem[]) => {
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null);
@@ -128,7 +128,12 @@ export function KnowledgeQuizSession() {
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
     try {
-      const input: KnowledgeQuizInput = { previousAnswers: updatedHistory.map(h => ({question: h.question, answer: h.answer})), topic: currentTopic, educationLevel: currentEducationLevel };
+      const input: KnowledgeQuizInput = { 
+        previousAnswers: updatedHistory.map(h => ({question: h.question, answer: h.answer})), 
+        topic: currentTopic, 
+        educationLevel: currentEducationLevel,
+        language: currentLanguage,
+      };
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
 
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
@@ -136,7 +141,7 @@ export function KnowledgeQuizSession() {
         setCurrentStep('questioning');
       } else {
         setIncorrectlyAnsweredQuestions(updatedHistory.filter(item => !item.isCorrect));
-        fetchQuizSummary(currentTopic, currentEducationLevel, updatedHistory);
+        fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, updatedHistory);
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching next question:", error);
@@ -148,7 +153,7 @@ export function KnowledgeQuizSession() {
     }
   };
 
-  const fetchQuizSummary = async (currentTopic: string, currentEducationLevel: EducationLevel, finalHistory: HistoryItem[]) => {
+  const fetchQuizSummary = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, finalHistory: HistoryItem[]) => {
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null);
@@ -161,7 +166,13 @@ export function KnowledgeQuizSession() {
         return acc;
       }, {} as Record<string, string>);
 
-      const input: QuizSummaryInput = { topic: currentTopic, educationLevel: currentEducationLevel, responses, conversationHistory: finalHistory.map(h => ({question: h.question, answer: h.answer})) };
+      const input: QuizSummaryInput = { 
+        topic: currentTopic, 
+        educationLevel: currentEducationLevel, 
+        language: currentLanguage,
+        responses, 
+        conversationHistory: finalHistory.map(h => ({question: h.question, answer: h.answer})) 
+      };
       const output: QuizSummaryOutput = await getQuizSummary(input);
       setSummaryText(output.summary);
       setFurtherLearningSuggestions(output.furtherLearningSuggestions);
@@ -195,6 +206,7 @@ export function KnowledgeQuizSession() {
         userAnswer: data.answer,
         topic: topic,
         educationLevel: educationLevel,
+        language: language,
       };
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
       console.log("KnowledgeQuizSession: AI Evaluation Output:", evalOutput); 
@@ -227,20 +239,18 @@ export function KnowledgeQuizSession() {
         const updatedReviewItems = [...incorrectlyAnsweredQuestions];
         updatedReviewItems[currentReviewQuestionIndex] = {
             ...updatedReviewItems[currentReviewQuestionIndex],
-            answer: data.answer, // User's new answer during review
-            isCorrect: isCorrect, // Updated correctness
-            explanation: explanationText, // Updated explanation
-            imageSuggestion: imgSuggestion // Updated image suggestion
+            answer: data.answer, 
+            isCorrect: isCorrect, 
+            explanation: explanationText, 
+            imageSuggestion: imgSuggestion 
         };
         setIncorrectlyAnsweredQuestions(updatedReviewItems);
-        // Also update the main history if this question exists there
         const mainHistoryIndex = history.findIndex(h => h.question === updatedReviewItems[currentReviewQuestionIndex].question);
         if (mainHistoryIndex > -1) {
             const updatedHistory = [...history];
-            updatedHistory[mainHistoryIndex] = { ...updatedHistory[mainHistoryIndex], ...updatedReviewItems[currentReviewQuestionIndex]}; // update with new answer, isCorrect, explanation
+            updatedHistory[mainHistoryIndex] = { ...updatedHistory[mainHistoryIndex], ...updatedReviewItems[currentReviewQuestionIndex]}; 
             setHistory(updatedHistory);
         }
-
     } else {
         const updatedHistory = [...history, newHistoryItem];
         setHistory(updatedHistory);
@@ -255,40 +265,36 @@ export function KnowledgeQuizSession() {
     setShowExplanationSection(false);
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
-    answerForm.reset(); // Reset the answer form
+    answerForm.reset(); 
 
     if (isReviewMode) {
         const nextIndex = currentReviewQuestionIndex + 1;
         if (nextIndex < incorrectlyAnsweredQuestions.length) {
             setCurrentReviewQuestionIndex(nextIndex);
             setCurrentQuestionText(incorrectlyAnsweredQuestions[nextIndex].question);
-            // Pre-fill with their previous incorrect answer for re-attempt
             answerForm.setValue('answer', incorrectlyAnsweredQuestions[nextIndex].answer || ''); 
             setCurrentStep('questioning');
         } else {
-            // Review finished
             setIsReviewMode(false);
-            // Potentially re-fetch summary if answers changed, or just go to summary
-            fetchQuizSummary(topic, educationLevel, history); 
+            fetchQuizSummary(topic, educationLevel, language, history); 
             toast({title: "Review Complete!", description: "You've reviewed all incorrect answers.", variant: "default"});
         }
     } else {
-        fetchNextQuestion(topic, educationLevel, history);
+        fetchNextQuestion(topic, educationLevel, language, history);
     }
   };
 
   const handleStartReview = () => {
-    // Filter for questions that are still marked incorrect in the main history
     const questionsToReview = history.filter(item => !item.isCorrect);
     if (questionsToReview.length > 0) {
         setIncorrectlyAnsweredQuestions(questionsToReview);
         setIsReviewMode(true);
         setCurrentReviewQuestionIndex(0);
         setCurrentQuestionText(questionsToReview[0].question);
-        answerForm.setValue('answer', questionsToReview[0].answer || ''); // Pre-fill with their original incorrect answer
-        setCurrentExplanation(null); // Clear previous explanation
-        setCurrentImageSuggestion(null); // Clear previous image suggestion
-        setShowExplanationSection(false); // Hide explanation section for the new question
+        answerForm.setValue('answer', questionsToReview[0].answer || ''); 
+        setCurrentExplanation(null); 
+        setCurrentImageSuggestion(null); 
+        setShowExplanationSection(false); 
         setCurrentStep('questioning');
         toast({title: "Review Mode", description: "Let's go over the questions you missed.", variant: "default"});
     } else {
@@ -304,11 +310,11 @@ export function KnowledgeQuizSession() {
     setFurtherLearningSuggestions(null);
     setErrorMessage(null);
     setTopic("");
-    // educationLevel is reset by configForm.reset
+    setLanguage("English");
     setIncorrectlyAnsweredQuestions([]);
     setIsReviewMode(false);
     setCurrentReviewQuestionIndex(0);
-    configForm.reset({ topic: "", educationLevel: "HighSchool" });
+    configForm.reset({ topic: "", educationLevel: "HighSchool", language: "English" });
     answerForm.reset();
     setIsLoading(false);
     setIsEvaluating(false);
@@ -387,36 +393,56 @@ export function KnowledgeQuizSession() {
                 <FormField
                   control={configForm.control}
                   name="educationLevel"
-                  render={({ field }) => {
-                    console.log('[EducationLevel Field Render] field.value:', field.value);
-                    return (
-                      <FormItem>
-                        <FormLabel className="text-lg">Education Level</FormLabel>
-                        <Select
-                          onValueChange={(value) => {
-                            console.log('[EducationLevel Select onValueChange] selected value:', value);
-                            field.onChange(value as EducationLevel);
-                            console.log('[EducationLevel Select onValueChange] called field.onChange with:', value);
-                          }}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
-                              <SelectValue placeholder="Select education level" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {EducationLevels.options.map((level) => (
-                              <SelectItem key={level} value={level} className="text-base">
-                                {level.replace(/([A-Z])/g, ' $1').trim()}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg">Education Level</FormLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(value as EducationLevel)}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
+                            <SelectValue placeholder="Select education level" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {EducationLevels.options.map((level) => (
+                            <SelectItem key={level} value={level} className="text-base">
+                              {level.replace(/([A-Z])/g, ' $1').trim()}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={configForm.control}
+                  name="language"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg">Language</FormLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(value as SupportedLanguage)}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="text-base shadow-sm focus:ring-2 focus:ring-primary">
+                            <SelectValue placeholder="Select language" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {SupportedLanguages.options.map((lang) => (
+                            <SelectItem key={lang} value={lang} className="text-base">
+                              {lang}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
                 <Button type="submit" size="lg" className="w-full shadow-md" disabled={isLoading || isEvaluating}>
                   {isLoading || isEvaluating ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-1 h-5 w-5" />}
@@ -435,7 +461,7 @@ export function KnowledgeQuizSession() {
                 {isReviewMode ? "Reviewing: " : "Topic: "}{topic}
              </CardTitle>
              <CardDescription className="text-center sm:text-left">
-                Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} |
+                Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {language} |
                 {isReviewMode ? ` Review Question ${currentReviewQuestionIndex + 1} of ${incorrectlyAnsweredQuestions.length}` : ` Question ${history.length + (showExplanationSection ? 0 : 1)}`}
              </CardDescription>
           </CardHeader>
@@ -455,7 +481,7 @@ export function KnowledgeQuizSession() {
                         item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <span className="ml-1 text-xl self-start">🤔</span>
                       ) : <span className="ml-1 text-xl self-start">🤔</span>}
                     </div>
-                    <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap">
+                    <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap prose prose-p:my-1">
                       <span className="font-semibold">Your Answer: </span>{item.answer}
                     </p>
                   </div>
@@ -494,13 +520,12 @@ export function KnowledgeQuizSession() {
                     <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
                     <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
                     <AlertDescription className="text-green-700/90 dark:text-green-400/90">
-                        <ReactMarkdown className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1">
+                        <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1">
                             {currentExplanation}
-                        </ReactMarkdown>
+                        </div>
                       {currentImageSuggestion && (
                         <div className="mt-1 p-1 border-t border-green-200 dark:border-green-700/30">
                             <p className="text-xs text-green-600 dark:text-green-400/80 mb-1 italic">Suggested image for clarity:</p>
-                             {/* console.log("Rendering image with suggestion:", currentImageSuggestion); */}
                             <Image
                                 src={`https://placehold.co/300x200.png`}
                                 alt={currentImageSuggestion || "Visual aid for explanation"}
@@ -556,7 +581,7 @@ export function KnowledgeQuizSession() {
                 <CheckCircle2 className="w-10 h-10 text-accent mr-1" />
                 <CardTitle className="text-2xl">Quiz Summary</CardTitle>
             </div>
-            <CardDescription>Topic: {topic} | Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()}</CardDescription>
+            <CardDescription>Topic: {topic} | Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {language}</CardDescription>
           </CardHeader>
           <CardContent className="p-1 space-y-1">
             {history.length > 0 && (
@@ -575,14 +600,12 @@ export function KnowledgeQuizSession() {
                                       item.isCorrect ? <ThumbsUp className="ml-1 text-green-500 w-4 h-4 self-start"/> : <span className="ml-1 text-xl self-start">🤔</span>
                                     ) : <span className="ml-1 text-xl self-start">🤔</span> }
                                 </div>
-                                <p className="text-xs text-muted-foreground pl-1 mt-1 whitespace-pre-wrap"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
+                                <p className="text-xs text-muted-foreground pl-1 mt-1 whitespace-pre-wrap prose prose-p:my-1"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
                                 {item.explanation && (
                                   <div className="mt-1 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
                                     <p className="font-semibold text-green-700 dark:text-green-300">Explanation:</p>
-                                    <div className="text-green-700/90 dark:text-green-400/90">
-                                      <ReactMarkdown className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1">
+                                    <div className="text-green-700/90 dark:text-green-400/90 prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1">
                                         {item.explanation}
-                                      </ReactMarkdown>
                                     </div>
                                     {item.imageSuggestion && (
                                         <div className="mt-1 pt-1 border-t border-green-200 dark:border-green-700/30">
@@ -619,10 +642,8 @@ export function KnowledgeQuizSession() {
                     <CardTitle className="text-xl text-primary flex items-center space-x-1"><Lightbulb className="w-5 h-5 mr-1"/>Main Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="p-1">
-                    <div className="text-card-foreground whitespace-pre-wrap">
-                        <ReactMarkdown className="prose dark:prose-invert max-w-none prose-p:my-1">
-                            {summaryText}
-                        </ReactMarkdown>
+                    <div className="text-card-foreground whitespace-pre-wrap prose dark:prose-invert max-w-none prose-p:my-1">
+                        {summaryText}
                     </div>
                 </CardContent>
                 </Card>
@@ -633,7 +654,7 @@ export function KnowledgeQuizSession() {
                         <CardTitle className="text-xl text-accent flex items-center space-x-1"><BookOpen className="w-5 h-5 mr-1"/>Further Learning</CardTitle>
                     </CardHeader>
                     <CardContent className="p-1">
-                        <ul className="list-disc pl-5 space-y-1 text-card-foreground">
+                        <ul className="list-disc pl-1 space-y-1 text-card-foreground">
                         {furtherLearningSuggestions.map((suggestion, index) => (
                             <li key={`learn-${index}`} className="whitespace-pre-wrap">{suggestion}</li>
                         ))}

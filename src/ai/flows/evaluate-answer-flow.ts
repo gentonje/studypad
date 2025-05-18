@@ -11,19 +11,20 @@
 
 import {ai} from '@/ai/genkit';
 import {z}from 'genkit';
-import { EducationLevels, type EducationLevel } from './types';
+import { EducationLevels, SupportedLanguages, type EducationLevel, type SupportedLanguage } from './types';
 
 const EvaluateAnswerInputSchema = z.object({
   question: z.string().describe('The quiz question that was asked.'),
   userAnswer: z.string().describe("The user's answer to the question."),
   topic: z.string().describe('The general topic of the quiz.'),
   educationLevel: EducationLevels.describe('The target education level for the quiz.'),
+  language: SupportedLanguages.optional().describe('The language for the explanation. Defaults to English.'),
 });
 export type EvaluateAnswerInput = z.infer<typeof EvaluateAnswerInputSchema>;
 
 const EvaluateAnswerOutputSchema = z.object({
   isCorrect: z.boolean().describe('Whether the user answer is considered correct for the given question, topic, and education level.'),
-  explanation: z.string().describe('A detailed, teacher-like explanation for why the answer is correct or incorrect, tailored to the education level, formatted in Markdown. This should always be provided and aim to help the student understand the underlying concept thoroughly.'),
+  explanation: z.string().describe('A detailed, teacher-like explanation for why the answer is correct or incorrect, tailored to the education level and specified language. This should always be provided and aim to help the student understand the underlying concept thoroughly. Provide the explanation in PLAIN TEXT, without Markdown formatting for bold, italics, or tables. Use natural language for structure.'),
   imageSuggestion: z.string().optional().describe("A one or two-word search term for an image that could visually clarify the explanation, if applicable. Max two words. E.g., 'photosynthesis diagram' or 'volcano eruption'.")
 });
 export type EvaluateAnswerOutput = z.infer<typeof EvaluateAnswerOutputSchema>;
@@ -36,30 +37,25 @@ const evaluateAnswerPrompt = ai.definePrompt({
   name: 'evaluateAnswerPrompt',
   input: {schema: EvaluateAnswerInputSchema},
   output: {schema: EvaluateAnswerOutputSchema},
-  prompt: `You are an expert AI educator evaluating a student's answer to a quiz question. Your goal is not just to mark it right or wrong, but to help the student truly understand the concept.
+  prompt: `You are an expert AI educator evaluating a student's answer to a quiz question. Your goal is not just to mark it right or wrong, but to help the student truly understand the concept in their chosen language.
 
 Topic: {{{topic}}}
 Education Level: {{{educationLevel}}}
+Language for explanation: {{#if language}}{{language}}{{else}}English{{/if}}.
 
-Question: {{{question}}}
+Question (in {{#if language}}{{language_preference question_language else="original"}}{{else}}English{{/if}}): {{{question}}}
 User's Answer: {{{userAnswer}}}
 
-Please provide:
+Please provide your response in {{#if language}}{{language}}{{else}}English{{/if}}.
 1.  \`isCorrect\`: A boolean indicating if the user's answer is substantially correct for the given question, topic, and education level. Be reasonably flexible with phrasing if the core concept is correct. If the answer is too vague, or clearly wrong, mark it as incorrect.
 2.  \`explanation\`: A detailed, teacher-like explanation.
-    *   If correct: Explain *why* it's correct, perhaps reinforcing the key concepts or adding a bit more relevant detail.
-    *   If incorrect: Clearly explain the misunderstanding or error. Provide the correct information and explain the reasoning behind it.
-    *   The explanation MUST be tailored to the student's specified education level and should help them understand the concept better. Use analogies or simpler terms if appropriate for the level.
-    *   IMPORTANT: The explanation should be formatted using **Markdown** to enhance readability and structure. You can use elements like:
-        *   Headings (e.g., \`## Key Concept\`, \`### Details\`)
-        *   Bold (\`**important term**\`) and italics (\`*emphasis*\`)
-        *   Bullet points (using \`*\`, \`-\`, or \`+\`) for lists
-        *   Numbered lists
-        *   Paragraphs for clear separation of ideas.
-        Avoid overly complex Markdown or HTML. The goal is a clear, teacher-like explanation.
-3.  \`imageSuggestion\`: If a simple image, diagram, or pictorial could significantly help in understanding the explanation (e.g., for visual concepts like a cell structure, a historical map, a type of rock), provide a one or two-word search term for such an image. Examples: "cell mitosis", "roman aqueduct", "igneous rock". If no image is particularly helpful, omit this field. Maximum two words.
+    *   If correct: Explain *why* it's correct in {{#if language}}{{language}}{{else}}English{{/if}}, perhaps reinforcing the key concepts or adding a bit more relevant detail.
+    *   If incorrect: Clearly explain the misunderstanding or error in {{#if language}}{{language}}{{else}}English{{/if}}. Provide the correct information and explain the reasoning behind it.
+    *   The explanation MUST be tailored to the student's specified education level and language ({{#if language}}{{language}}{{else}}English{{/if}}). It should help them understand the concept better. Use analogies or simpler terms if appropriate for the level and language.
+    *   IMPORTANT: The explanation should be in **PLAIN TEXT** only. Do NOT use Markdown formatting like \`**bold**\`, \`*italics*\`, or table structures. Use natural language and paragraphs for clear separation of ideas.
+3.  \`imageSuggestion\`: If a simple image, diagram, or pictorial could significantly help in understanding the explanation (e.g., for visual concepts like a cell structure, a historical map, a type of rock), provide a one or two-word search term for such an image. Examples: "cell mitosis", "roman aqueduct", "igneous rock". If no image is particularly helpful, omit this field. Maximum two words. These terms should be in English or a broadly understandable format for image search.
 
-Ensure your output strictly adheres to the requested JSON format and that the explanation is thorough, pedagogical, and formatted in Markdown.
+Ensure your output strictly adheres to the requested JSON format and that the explanation is thorough, pedagogical, plain text, and in the specified language ({{#if language}}{{language}}{{else}}English{{/if}}).
 `,
 });
 
@@ -75,7 +71,7 @@ const evaluateAnswerGenkitFlow = ai.defineFlow(
         console.error('AI output for evaluateAnswerFlow was invalid or incomplete:', output);
         return { 
             isCorrect: false, 
-            explanation: "Could not determine correctness or provide a detailed explanation at this time. Please ensure your answer is clear.",
+            explanation: `Could not determine correctness or provide a detailed explanation in ${input.language || 'English'} at this time. Please ensure your answer is clear.`,
             imageSuggestion: undefined
         };
     }

@@ -12,3 +12,18 @@ export const EducationLevels = z.enum([
   'PhD' // Doctoral level
 ]).describe('The education level of the user.');
 export type EducationLevel = z.infer<typeof EducationLevels>;
+
+export const SupportedLanguages = z.enum([
+  "English",
+  "Spanish",
+  "French",
+  "German",
+  "Chinese (Simplified)",
+  "Japanese",
+  "Korean",
+  "Arabic",
+  "Hindi",
+  "Swahili",
+  "Portuguese"
+]).describe('Supported languages for the quiz content.');
+export type SupportedLanguage = z.infer<typeof SupportedLanguages>;
