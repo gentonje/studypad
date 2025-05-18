@@ -22,7 +22,7 @@ export type EvaluateAnswerInput = z.infer<typeof EvaluateAnswerInputSchema>;
 
 const EvaluateAnswerOutputSchema = z.object({
   isCorrect: z.boolean().describe('Whether the user answer is considered correct for the given question, topic, and education level.'),
-  explanation: z.string().optional().describe('A brief explanation for why the answer is correct or incorrect (optional).'),
+  explanation: z.string().describe('A clear and concise explanation for why the answer is correct or incorrect, tailored to the education level. This should always be provided.'),
 });
 export type EvaluateAnswerOutput = z.infer<typeof EvaluateAnswerOutputSchema>;
 
@@ -35,7 +35,9 @@ const evaluateAnswerPrompt = ai.definePrompt({
   input: {schema: EvaluateAnswerInputSchema},
   output: {schema: EvaluateAnswerOutputSchema},
   prompt: `You are an AI quiz evaluator. Your task is to determine if the user's answer is correct for the given question, considering the topic and education level.
-Provide a boolean \`isCorrect\` and an optional \`explanation\`.
+You MUST provide:
+1. A boolean \`isCorrect\`.
+2. A clear and concise \`explanation\` for why the answer is correct or incorrect. This explanation MUST be tailored to the user's specified education level and should help them understand the concept better.
 
 Topic: {{{topic}}}
 Education Level: {{{educationLevel}}}
@@ -45,6 +47,7 @@ User's Answer: {{{userAnswer}}}
 
 Based on this information, evaluate the user's answer. Be reasonably flexible with phrasing if the core concept is correct for the given education level.
 If the answer is too vague, or clearly wrong, mark it as incorrect.
+Ensure the explanation is helpful and directly addresses the user's answer in relation to the question.
 `,
 });
 
@@ -56,11 +59,15 @@ const evaluateAnswerGenkitFlow = ai.defineFlow(
   },
   async (input: EvaluateAnswerInput) => {
     const {output} = await evaluateAnswerPrompt(input);
-    if (!output || typeof output.isCorrect !== 'boolean') {
+    if (!output || typeof output.isCorrect !== 'boolean' || !output.explanation) {
         console.error('AI output for evaluateAnswerFlow was invalid or incomplete:', output);
-        // Fallback if AI fails to provide a clear boolean
-        return { isCorrect: false, explanation: "Could not determine correctness." };
+        // Fallback if AI fails to provide a clear boolean or explanation
+        return { 
+            isCorrect: false, 
+            explanation: "Could not determine correctness or provide a detailed explanation at this time. Please ensure your answer is clear." 
+        };
     }
     return output;
   }
 );
+

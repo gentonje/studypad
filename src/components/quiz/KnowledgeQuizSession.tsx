@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check } from 'lucide-react';
+import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, Check, ArrowRight } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const configFormSchema = z.object({
@@ -36,6 +36,7 @@ interface HistoryItem {
   question: string;
   answer: string;
   isCorrect?: boolean;
+  explanation?: string;
 }
 
 export function KnowledgeQuizSession() {
@@ -49,6 +50,8 @@ export function KnowledgeQuizSession() {
   const [educationLevel, setEducationLevel] = useState<EducationLevel>("HighSchool");
   const [isLoading, setIsLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [currentExplanation, setCurrentExplanation] = useState<string | null>(null);
+  const [showExplanationSection, setShowExplanationSection] = useState(false);
 
 
   const { toast } = useToast();
@@ -72,6 +75,8 @@ export function KnowledgeQuizSession() {
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null);
+    setShowExplanationSection(false);
+    setCurrentExplanation(null);
     try {
       const input: KnowledgeQuizInput = { previousAnswers: [], topic: currentTopic, educationLevel: currentEducationLevel };
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
@@ -102,6 +107,8 @@ export function KnowledgeQuizSession() {
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null);
+    setShowExplanationSection(false);
+    setCurrentExplanation(null);
     try {
       const input: KnowledgeQuizInput = { previousAnswers: updatedHistory.map(h => ({question: h.question, answer: h.answer})), topic: currentTopic, educationLevel: currentEducationLevel };
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
@@ -126,6 +133,8 @@ export function KnowledgeQuizSession() {
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null);
+    setShowExplanationSection(false);
+    setCurrentExplanation(null);
     try {
       const responses = finalHistory.reduce((acc, item, index) => {
         acc[`q${index}_${item.question.substring(0,15).replace(/\s/g,'_')}`] = item.answer;
@@ -151,8 +160,11 @@ export function KnowledgeQuizSession() {
   const handleAnswerSubmit: SubmitHandler<AnswerFormData> = async (data) => {
     if (!currentQuestionText) return;
     setIsEvaluating(true);
+    setShowExplanationSection(false);
+    setCurrentExplanation(null); 
+
     let isCorrect = false;
-    let explanation: string | undefined = "Let's keep trying!";
+    let explanationText = "Could not retrieve explanation for this answer.";
 
     try {
       const evalInput: EvaluateAnswerInput = {
@@ -163,28 +175,36 @@ export function KnowledgeQuizSession() {
       };
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
       isCorrect = evalOutput.isCorrect;
-      explanation = evalOutput.explanation || (isCorrect ? "Great job!" : "Let's keep trying!");
+      explanationText = evalOutput.explanation || (isCorrect ? "Great job!" : "That's not quite right, let's look at why.");
 
+      // Toast notification can remain or be enhanced
       if (isCorrect) {
-        toast({ title: "Correct!", description: explanation, variant: "default", duration: 2000 });
+        toast({ title: "Correct!", description: "View explanation below.", variant: "default", duration: 2000 });
       } else {
-        toast({ title: "Incorrect", description: explanation, variant: "destructive", duration: 2500 });
+        toast({ title: "Check Explanation", description: "See details below.", variant: "default", duration: 2500 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
-      toast({ title: "Evaluation Error", description: "Couldn't evaluate answer, moving on.", variant: "destructive", duration: 2000 });
-      // isCorrect remains false
+      explanationText = "An error occurred while evaluating your answer.";
+      toast({ title: "Evaluation Error", description: "Couldn't evaluate answer. See explanation section.", variant: "destructive", duration: 2000 });
     } finally {
       setIsEvaluating(false);
     }
 
-    const newHistoryItem: HistoryItem = { question: currentQuestionText, answer: data.answer, isCorrect };
+    const newHistoryItem: HistoryItem = { question: currentQuestionText, answer: data.answer, isCorrect, explanation: explanationText };
     const updatedHistory = [...history, newHistoryItem];
     setHistory(updatedHistory);
-    answerForm.reset();
+    // Do NOT reset answerForm or fetchNextQuestion here. User needs to see explanation first.
+    
+    setCurrentExplanation(explanationText);
+    setShowExplanationSection(true);
+  };
 
-    // Fetch next question or summary after evaluation and history update
-    fetchNextQuestion(topic, educationLevel, updatedHistory);
+  const handleProceedToNextQuestion = () => {
+    setShowExplanationSection(false);
+    setCurrentExplanation(null);
+    answerForm.reset(); // Reset form for the new question
+    fetchNextQuestion(topic, educationLevel, history); // 'history' is already updated from handleAnswerSubmit
   };
   
   const handleRestartQuiz = () => {
@@ -199,10 +219,12 @@ export function KnowledgeQuizSession() {
     answerForm.reset();
     setIsLoading(false);
     setIsEvaluating(false);
+    setShowExplanationSection(false);
+    setCurrentExplanation(null);
   };
 
   const getLoadingMessage = () => {
-    if (isEvaluating) return "Evaluating your answer...";
+    if (isEvaluating && !showExplanationSection) return "Evaluating your answer...";
     if (currentStep === 'loading') {
         if (!currentQuestionText && !summaryText && history.length === 0) return "Preparing your quiz...";
         if (currentQuestionText && !summaryText) return "Getting next question...";
@@ -211,7 +233,7 @@ export function KnowledgeQuizSession() {
     return "Loading...";
   };
   
-  if ((isLoading || isEvaluating) && currentStep !== 'questioning' && currentStep !== 'summary' && currentStep !== 'config' && currentStep !== 'error') {
+  if ((isLoading || (isEvaluating && !showExplanationSection)) && currentStep !== 'questioning' && currentStep !== 'summary' && currentStep !== 'config' && currentStep !== 'error') {
     return (
       <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
         <CardContent className="p-4 sm:p-6 min-h-[300px] flex flex-col items-center justify-center text-center">
@@ -306,10 +328,10 @@ export function KnowledgeQuizSession() {
         <>
           <CardHeader className="bg-muted/50 p-4 sm:p-6 border-b">
              <CardTitle className="text-xl text-center sm:text-left text-primary">Topic: {topic}</CardTitle>
-             <CardDescription className="text-center sm:text-left">Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Question {history.length + 1}</CardDescription>
+             <CardDescription className="text-center sm:text-left">Level: {educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Question {history.length + (showExplanationSection ? 0 : 1)}</CardDescription>
           </CardHeader>
           
-          {history.length > 0 && (
+          {history.length > 0 && !showExplanationSection && ( // Only show history if not showing current explanation
             <CardContent className="p-3 sm:p-4 max-h-60">
               <ScrollArea className="h-full pr-3">
                 <div className="space-y-4">
@@ -335,7 +357,7 @@ export function KnowledgeQuizSession() {
             </CardContent>
           )}
 
-          <CardContent className={`p-4 sm:p-6 ${history.length > 0 ? 'pt-2 sm:pt-3' : ''}`}>
+          <CardContent className={`p-4 sm:p-6 ${history.length > 0 && !showExplanationSection ? 'pt-2 sm:pt-3' : ''}`}>
             <Form {...answerForm}>
               <form onSubmit={answerForm.handleSubmit(handleAnswerSubmit)} className="space-y-6">
                 <FormField
@@ -352,21 +374,39 @@ export function KnowledgeQuizSession() {
                           className="min-h-[100px] text-base resize-none shadow-sm focus:ring-2 focus:ring-primary"
                           {...field}
                           aria-label="Your answer"
-                          disabled={isLoading || isEvaluating}
+                          disabled={isLoading || isEvaluating || showExplanationSection}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full sm:w-auto shadow-md" disabled={isLoading || isEvaluating || answerForm.formState.isSubmitting}>
-                  {isLoading || isEvaluating || answerForm.formState.isSubmitting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="mr-2 h-4 w-4" />
-                  )}
-                  {isEvaluating ? 'Evaluating...' : 'Submit Answer'}
-                </Button>
+
+                {showExplanationSection && currentExplanation && (
+                  <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/40 shadow-sm rounded-md">
+                    <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
+                    <AlertDescription className="text-green-700/90 dark:text-green-400/90 whitespace-pre-wrap">
+                      {currentExplanation}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {showExplanationSection ? (
+                   <Button onClick={handleProceedToNextQuestion} className="w-full sm:w-auto shadow-md" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                    Next Question
+                  </Button>
+                ) : (
+                  <Button type="submit" className="w-full sm:w-auto shadow-md" disabled={isLoading || isEvaluating || answerForm.formState.isSubmitting}>
+                    {isEvaluating ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="mr-2 h-4 w-4" />
+                    )}
+                    {isEvaluating ? 'Evaluating...' : 'Submit Answer'}
+                  </Button>
+                )}
               </form>
             </Form>
           </CardContent>
@@ -391,13 +431,13 @@ export function KnowledgeQuizSession() {
             {history.length > 0 && (
                 <Card className="bg-background/50 shadow-md">
                     <CardHeader className="p-3 sm:p-4">
-                        <CardTitle className="text-lg text-primary flex items-center gap-2"><Check className="w-5 h-5"/>Your Answers:</CardTitle>
+                        <CardTitle className="text-lg text-primary flex items-center gap-2"><Check className="w-5 h-5"/>Your Answers & Explanations:</CardTitle>
                     </CardHeader>
-                    <CardContent className="max-h-72 p-3 sm:p-4">
+                    <CardContent className="max-h-96 p-3 sm:p-4">
                          <ScrollArea className="h-full pr-3">
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                             {history.map((item, index) => (
-                            <div key={index} className="text-sm p-2 rounded-md bg-muted/30 border border-border/50">
+                            <div key={index} className="text-sm p-3 rounded-md bg-muted/30 border border-border/50 shadow-inner">
                                 <div className="font-medium text-card-foreground flex items-start">
                                     <span className="mr-1 flex-1 whitespace-pre-wrap">{index+1}. {item.question}</span>
                                     {typeof item.isCorrect === 'boolean' && (
@@ -405,6 +445,12 @@ export function KnowledgeQuizSession() {
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground pl-4 mt-1 whitespace-pre-wrap"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
+                                {item.explanation && (
+                                  <div className="mt-2 p-2 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
+                                    <p className="font-semibold text-green-700 dark:text-green-300">Explanation:</p>
+                                    <p className="text-green-700/90 dark:text-green-400/90 whitespace-pre-wrap">{item.explanation}</p>
+                                  </div>
+                                )}
                             </div>
                             ))}
                             </div>
@@ -450,3 +496,4 @@ export function KnowledgeQuizSession() {
     </Card>
   );
 }
+
