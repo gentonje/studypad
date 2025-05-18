@@ -11,7 +11,7 @@ const KnowledgeQuizAiLogo = () => (
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     className="text-primary"
-    aria-label="Knowledge Quiz AI Logo"
+    aria-label="Student Companion Logo"
   >
     <rect x="10" y="10" width="80" height="80" rx="10" stroke="currentColor" strokeWidth="8" />
     <text
@@ -24,7 +24,7 @@ const KnowledgeQuizAiLogo = () => (
       fill="currentColor"
       fontFamily="var(--font-geist-sans), Arial, sans-serif"
     >
-      KQ
+      SC
     </text>
   </svg>
 );
@@ -36,7 +36,7 @@ export default function HomePage() {
       <header className="w-full max-w-md mx-auto text-center p-1 space-y-1">
         <div className="flex items-center justify-center space-x-1 mb-1">
           <KnowledgeQuizAiLogo />
-          <h1 className="text-3xl md:text-4xl font-bold text-primary">Knowledge Quiz AI</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-primary">Student Companion</h1>
         </div>
         <p className="text-md md:text-lg text-muted-foreground">
           Test your knowledge on any topic, at any level.
@@ -46,7 +46,7 @@ export default function HomePage() {
         <KnowledgeQuizSession />
       </main>
       <footer className="w-full max-w-md mx-auto text-center text-sm text-muted-foreground p-1 space-y-1">
-        <p>&copy; {new Date().getFullYear()} Knowledge Quiz AI. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Student Companion. All rights reserved.</p>
         <p className="mt-1">
           This tool is for educational and informational purposes.
         </p>

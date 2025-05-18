@@ -15,8 +15,8 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Knowledge Quiz AI',
-  description: 'AI-Powered General Knowledge Quiz',
+  title: 'Student Companion',
+  description: 'AI-Powered General Knowledge Quiz and Student Helper',
 };
 
 export default function RootLayout({
