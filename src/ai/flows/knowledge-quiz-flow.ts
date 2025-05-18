@@ -76,10 +76,15 @@ Based on the topic, education level, language, the conversation history (if any)
 The question should be clear, concise, and appropriate for the {{{educationLevel}}} level, and strictly in the specified language ({{#if language}}{{language}}{{else}}English{{/if}}).
 Avoid yes/no questions; aim for questions that require a short explanation or factual recall.
 
-IMPORTANT: Your primary objective is to conduct a comprehensive quiz. Aim for a minimum of 20 questions if the topic (and document content, if provided) and education level can meaningfully support this number while maintaining question quality and relevance in the specified language.
-Do not stop asking just because a certain number of questions have been asked if the topic still has facets to explore appropriate for the user's level.
-However, prioritize relevance and depth. If, after thorough exploration, you find that the topic (and document content, if provided) is genuinely exhausted for the given education level and language, and you cannot formulate further distinct, high-quality, and meaningful questions, then you may set 'nextQuestion' to an empty string ("") to signal the end of the quiz, even if fewer than 20 questions have been asked.
-If the topic (and document content, if provided) is rich and the education level allows, you can go beyond 20 questions to ensure comprehensive coverage in the specified language.
+IMPORTANT: Adjust the number of questions based on the education level.
+-   For 'Preschool' and 'ElementarySchool', aim for approximately 5-8 high-quality questions.
+-   For 'MiddleSchool', aim for approximately 8-12 high-quality questions.
+-   For 'HighSchool', aim for approximately 12-18 high-quality questions.
+-   For 'College', 'Graduate', 'Masters', and 'PhD', aim for a comprehensive quiz of approximately 15-25 questions, or more if the topic (and document content, if provided) is rich and supports further exploration.
+
+Your primary objective is to conduct a comprehensive quiz appropriate for the level.
+Do not stop asking just because a certain number of questions have been asked if the topic still has facets to explore appropriate for the user's level and the guidelines above.
+However, prioritize relevance and depth. If, after thorough exploration, you find that the topic (and document content, if provided) is genuinely exhausted for the given education level and language, and you cannot formulate further distinct, high-quality, and meaningful questions, then you may set 'nextQuestion' to an empty string ("") to signal the end of the quiz, even if the target question count for that level hasn't been reached.
 
 Do not repeat questions.
 Generate only the next question. Ensure it is in {{#if language}}{{language}}{{else}}English{{/if}}.
@@ -97,3 +102,4 @@ const knowledgeQuizGenkitFlow = ai.defineFlow(
     return output!; 
   }
 );
+
