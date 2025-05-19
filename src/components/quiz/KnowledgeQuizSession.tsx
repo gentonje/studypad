@@ -22,7 +22,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // DialogTrigger removed
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, ArrowRight, Image as ImageIcon, ExternalLink, Home, Bot, FileText, XCircle, ThumbsUp, FileQuestion } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
@@ -202,7 +202,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         toast({ title: "PDF Processed", description: `${pdfFile.name} will be used for context.`, variant: "default" });
         setErrorMessage(null);
         if (generatedPdfDataUri) {
-           setIsPdfViewerOpen(true); // Open PDF viewer automatically
+           setIsPdfViewerOpen(true); 
         }
       } catch (error) {
         console.error("KnowledgeQuizSession: Error reading PDF file:", error);
@@ -528,7 +528,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     return (
       <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
         <CardHeader className="bg-muted/50 p-1 border-b">
-          <CardTitle className="text-xl text-destructive flex items-center"><AlertTriangle className="mr-1"/> Error</CardTitle>
+          <CardTitle className="text-xl text-destructive flex items-center gap-1"><AlertTriangle /> Error</CardTitle>
         </CardHeader>
         <CardContent className="p-1 min-h-[200px] flex flex-col items-center justify-center">
           <Alert variant="destructive" className="mx-auto">
@@ -556,11 +556,18 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
             <DialogTitle>PDF Document: {pdfFile?.name || 'Uploaded PDF'}</DialogTitle>
           </DialogHeader>
           {configPdfDataUri ? (
-            <iframe
-                src={configPdfDataUri}
-                title="PDF Document Viewer"
-                className="flex-grow w-full h-full border-0"
-            />
+            <object
+                data={configPdfDataUri}
+                type="application/pdf"
+                width="100%"
+                height="100%"
+                className="flex-grow"
+            >
+                <p className="p-4 text-center text-muted-foreground">
+                    It appears your browser does not support displaying PDFs this way. 
+                    You can try to <a href={configPdfDataUri} download={pdfFile?.name || "document.pdf"} className="text-primary hover:underline">download the PDF</a> instead.
+                </p>
+            </object>
           ) : (
             <div className="flex-grow flex items-center justify-center text-muted-foreground p-4">
                 <p>PDF will be displayed here once processed.</p>
@@ -840,9 +847,9 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                                   href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(currentImageSuggestion)}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center mt-1"
+                                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center mt-1 gap-1"
                                 >
-                                  Search for this image <ExternalLink className="w-3 h-3 ml-1" />
+                                  Search for this image <ExternalLink className="w-3 h-3" />
                                 </a>
                           </div>
                       )}
@@ -906,14 +913,14 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
               {history.length > 0 && (
                   <Card className="bg-background/50 shadow-md m-1">
                       <CardHeader className="p-1">
-                          <CardTitle className="text-lg text-primary flex items-center space-x-1"><MessageCircle className="w-5 h-5 mr-1"/>Your Answers & Explanations:</CardTitle>
+                          <CardTitle className="text-lg text-primary flex items-center space-x-1 gap-1"><MessageCircle className="w-5 h-5"/>Your Answers & Explanations:</CardTitle>
                       </CardHeader>
                       <CardContent className="max-h-96 p-1">
                           <ScrollArea className="h-full pr-1">
                               <div className="space-y-1">
                               {history.map((item, index) => (
                               <div key={`summary-hist-${index}-${item.question.substring(0,10)}`} className="text-sm p-1 rounded-md bg-muted/30 border border-border/50 shadow-inner">
-                                  <div className="font-medium text-card-foreground flex items-start space-x-1">
+                                  <div className="font-medium text-card-foreground flex items-start space-x-1 gap-1">
                                       <span className="mr-1 flex-1 whitespace-pre-wrap">{index+1}. {item.question}</span>
                                   </div>
                                   <p className="text-xs text-muted-foreground pl-1 mt-1 whitespace-pre-wrap prose prose-p:my-1"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
@@ -940,9 +947,9 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                                                 href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(item.imageSuggestion)}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center"
+                                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
                                               >
-                                                Search for: "{item.imageSuggestion}" <ExternalLink className="w-3 h-3 ml-1" />
+                                                Search for: "{item.imageSuggestion}" <ExternalLink className="w-3 h-3" />
                                               </a>
                                           </div>
                                       )}
@@ -958,7 +965,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
               {summaryText && (
                   <Card className="bg-background/50 shadow-md m-1">
                   <CardHeader className="p-1">
-                      <CardTitle className="text-xl text-primary flex items-center space-x-1"><Lightbulb className="w-5 h-5 mr-1"/>Main Summary</CardTitle>
+                      <CardTitle className="text-xl text-primary flex items-center space-x-1 gap-1"><Lightbulb className="w-5 h-5"/>Main Summary</CardTitle>
                   </CardHeader>
                   <CardContent className="p-1">
                       <div className="text-card-foreground whitespace-pre-wrap prose dark:prose-invert max-w-none prose-p:my-1">
@@ -970,7 +977,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
               {furtherLearningSuggestions && furtherLearningSuggestions.length > 0 && (
                   <Card className="bg-background/50 shadow-md m-1">
                       <CardHeader className="p-1">
-                          <CardTitle className="text-xl text-accent flex items-center space-x-1"><BookOpen className="w-5 h-5 mr-1"/>Further Learning</CardTitle>
+                          <CardTitle className="text-xl text-accent flex items-center space-x-1 gap-1"><BookOpen className="w-5 h-5"/>Further Learning</CardTitle>
                       </CardHeader>
                       <CardContent className="p-1">
                           <ul className="list-disc pl-1 space-y-1 text-card-foreground">
@@ -987,8 +994,8 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
               {incorrectlyAnsweredQuestions.length > 0 && !isReviewMode && (
                   <Card className="bg-orange-50 dark:bg-orange-900/30 shadow-md m-1 border-orange-300 dark:border-orange-700">
                       <CardHeader className="p-1">
-                          <CardTitle className="text-xl text-orange-600 dark:text-orange-400 flex items-center space-x-1">
-                              <RefreshCw className="w-5 h-5 mr-1"/>Review Your Answers
+                          <CardTitle className="text-xl text-orange-600 dark:text-orange-400 flex items-center space-x-1 gap-1">
+                              <RefreshCw className="w-5 h-5"/>Review Your Answers
                           </CardTitle>
                       </CardHeader>
                       <CardContent className="p-1">
@@ -1021,4 +1028,3 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     </>
   );
 }
-
