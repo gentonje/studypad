@@ -22,7 +22,7 @@ const GetTopicIntroductionInputSchema = z.object({
 export type GetTopicIntroductionInput = z.infer<typeof GetTopicIntroductionInputSchema>;
 
 const GetTopicIntroductionOutputSchema = z.object({
-  introductionText: z.string().describe('A concise introductory text about the topic, suitable for the specified education level and language. This text should prepare the user for a quiz on the topic. Provide in plain text, suitable for Markdown rendering.'),
+  introductionText: z.string().describe('A detailed and comprehensive introductory study text about the topic, suitable for the specified education level and language. This text should thoroughly prepare the user for a quiz on the topic, covering key concepts in depth. Provide in plain text, suitable for Markdown rendering.'),
 });
 export type GetTopicIntroductionOutput = z.infer<typeof GetTopicIntroductionOutputSchema>;
 
@@ -35,12 +35,12 @@ const getTopicIntroductionPrompt = ai.definePrompt({
   name: 'getTopicIntroductionPrompt',
   input: {schema: GetTopicIntroductionInputSchema},
   output: {schema: GetTopicIntroductionOutputSchema},
-  prompt: `You are an AI assistant that generates concise and informative introductory study text for a specific topic, tailored to a given education level and language. This text should prepare a user for a quiz on this topic.
+  prompt: `You are an AI assistant that generates detailed and comprehensive introductory study text for a specific topic, tailored to a given education level and language. This text should serve as a primary study material to prepare a user thoroughly for a quiz on this topic.
 {{#if pdfDataUri}}
-The user has provided the following PDF document for context. Your introduction MUST be consistent with and, where appropriate, draw key information from this document: {{media url=pdfDataUri}}.
-If the stated topic seems unrelated to the document, prioritize generating an introduction based on the document's actual content, perhaps trying to link it to the user's topic if a connection exists.
+The user has provided the following PDF document for context. Your introduction MUST be consistent with, draw key information from, and comprehensively summarize the relevant sections of this document: {{media url=pdfDataUri}}.
+If the stated topic seems unrelated to the document, prioritize generating an introduction based on the document's actual content, perhaps trying to link it to the user's topic if a connection exists. The introduction should reflect the depth of the provided document.
 {{else}}
-Generate the introduction based on general knowledge about the topic.
+Generate the introduction based on general knowledge about the topic, ensuring it is thorough and covers foundational concepts comprehensively for the specified education level.
 {{/if}}
 
 Topic: {{{topic}}}
@@ -49,11 +49,12 @@ Language for introduction: {{#if language}}{{language}}{{else}}English{{/if}}.
 
 Please provide the 'introductionText' in {{#if language}}{{language}}{{else}}English{{/if}}.
 The text should be:
-- Informative and cover key concepts or an overview relevant to the topic and education level.
-- Engaging and easy to understand for the target {{{educationLevel}}}.
-- Not too long; aim for a few paragraphs that can be read quickly.
-- Formatted in **PLAIN TEXT**. Do NOT use Markdown formatting like \`**bold**\`, \`*italics*\`, or table structures. Use natural language and paragraphs for clear separation of ideas. This text will be rendered using Markdown, so well-structured plain text is ideal.
-- Directly address the user as if preparing them for a quiz. For example, "Before we start the quiz on {{{topic}}}, let's quickly go over some key points..." or "To get you ready for your quiz on {{{topic}}}, here's a brief introduction...".
+-   **Detailed and Comprehensive**: Cover key concepts, definitions, important facts, and fundamental principles related to the topic, appropriate for the {{{educationLevel}}}. It should be more than just a brief overview; aim to provide enough substance for the user to learn from.
+-   **Well-Structured and Clear**: Organize the information logically. Use clear language, suitable for the target {{{educationLevel}}}.
+-   **Sufficiently Long**: The length should be adequate to cover the topic thoroughly for quiz preparation. This might be several paragraphs or more, depending on the topic's complexity and the education level.
+-   **Engaging and Educational**: The tone should be informative and encouraging.
+-   **Formatted in PLAIN TEXT**: Do NOT use Markdown formatting like \`**bold**\`, \`*italics*\`, or table structures. Use natural language and paragraphs for clear separation of ideas. This text will be rendered using Markdown, so well-structured plain text is ideal.
+-   **Directly address the user**: As if preparing them for a quiz. For example, "To help you prepare for your quiz on {{{topic}}}, let's dive into the key concepts..." or "Here's a detailed introduction to {{{topic}}} that will cover what you need to know...".
 `,
 });
 
@@ -68,9 +69,9 @@ const getTopicIntroductionGenkitFlow = ai.defineFlow(
     if (!output || typeof output.introductionText !== 'string' || output.introductionText.trim() === '') {
         console.error('AI output for getTopicIntroductionFlow was invalid or empty:', output);
         const langForMessage = input.language || 'English';
-        let errorMessageText = `Could not generate an introduction for "${input.topic}" in ${langForMessage} at the ${input.educationLevel} level.`;
+        let errorMessageText = `Could not generate a detailed introduction for "${input.topic}" in ${langForMessage} at the ${input.educationLevel} level.`;
         if (langForMessage === 'Spanish') {
-          errorMessageText = `No se pudo generar una introducción para "${input.topic}" en ${langForMessage} para el nivel ${input.educationLevel}.`;
+          errorMessageText = `No se pudo generar una introducción detallada para "${input.topic}" en ${langForMessage} para el nivel ${input.educationLevel}.`;
         }
         // Add more languages as needed
         return { 
@@ -80,3 +81,4 @@ const getTopicIntroductionGenkitFlow = ai.defineFlow(
     return output;
   }
 );
+
