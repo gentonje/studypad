@@ -10,6 +10,7 @@ import { z } from "zod";
 import { knowledgeQuizFlow, type KnowledgeQuizInput, type KnowledgeQuizOutput } from '@/ai/flows/knowledge-quiz-flow';
 import { getQuizSummary, type QuizSummaryInput, type QuizSummaryOutput } from '@/ai/flows/quiz-summary-flow';
 import { evaluateAnswer, type EvaluateAnswerInput, type EvaluateAnswerOutput } from '@/ai/flows/evaluate-answer-flow';
+import { getTopicIntroduction, type GetTopicIntroductionInput, type GetTopicIntroductionOutput } from '@/ai/flows/get-topic-introduction-flow';
 import { EducationLevels, SupportedLanguages, type EducationLevel, type SupportedLanguage } from '@/ai/flows/types';
 import ReactMarkdown from 'react-markdown';
 
@@ -22,7 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, ArrowRight, Image as ImageIcon, ExternalLink, Home, Bot, FileText, XCircle, ThumbsUp } from 'lucide-react';
+import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, ArrowRight, Image as ImageIcon, ExternalLink, Home, Bot, FileText, XCircle, ThumbsUp, FileQuestion } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const readFileAsDataURI = (file: File): Promise<string> => {
@@ -63,7 +64,8 @@ const MAX_POINTS_PER_QUESTION = 5;
 const REVIEW_SCORE_THRESHOLD = 3; 
 
 export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) {
-  const [currentStep, setCurrentStep] = useState<'config' | 'questioning' | 'summary' | 'loading' | 'error'>('config');
+  const [currentStep, setCurrentStep] = useState<'config' | 'introduction' | 'questioning' | 'summary' | 'loading' | 'error'>('config');
+  const [topicIntroductionText, setTopicIntroductionText] = useState<string | null>(null);
   const [currentQuestionText, setCurrentQuestionText] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [incorrectlyAnsweredQuestions, setIncorrectlyAnsweredQuestions] = useState<HistoryItem[]>([]);
@@ -110,6 +112,34 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     },
   });
 
+  const fetchTopicIntroduction = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, currentPdfDataUri: string | null) => {
+    console.log("KnowledgeQuizSession: Fetching topic introduction:", { currentTopic, currentEducationLevel, currentLanguage, pdfPresent: !!currentPdfDataUri });
+    setIsLoading(true);
+    setCurrentStep('loading');
+    setErrorMessage(null);
+    try {
+      const input: GetTopicIntroductionInput = {
+        topic: currentTopic,
+        educationLevel: currentEducationLevel,
+        language: currentLanguage,
+        pdfDataUri: currentPdfDataUri,
+      };
+      const output: GetTopicIntroductionOutput = await getTopicIntroduction(input);
+      setTopicIntroductionText(output.introductionText);
+      setCurrentStep('introduction');
+      toast({ title: "Topic Introduction Ready!", description: "Read the introduction below then start the quiz.", variant: "default" });
+    } catch (error) {
+      console.error("KnowledgeQuizSession: Error fetching topic introduction:", error);
+      const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
+      setErrorMessage(`Sorry, I couldn't get the topic introduction: ${errorMsg}. Please try configuring again.`);
+      setCurrentStep('error');
+      toast({ title: "Introduction Error", description: `Failed to load introduction: ${errorMsg}`, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
   const fetchInitialQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, currentPdfDataUri: string | null) => {
     console.log("KnowledgeQuizSession: Fetching initial question with input:", { currentTopic, currentEducationLevel, currentLanguage, pdfPresent: !!currentPdfDataUri });
     setIsLoading(true);
@@ -135,6 +165,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setCurrentStep('questioning');
       } else {
         setErrorMessage(`Could not generate the first question for this topic/level${currentPdfDataUri ? '/PDF' : ''}. Please try another combination or check the PDF content.`);
+        // If no questions, go to summary directly (it will likely be empty or an error message from summary flow)
         fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, [], currentPdfDataUri);
       }
     } catch (error) {
@@ -160,6 +191,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setErrorMessage(null);
     setCurrentUserScore(0);
     setCurrentTotalPossibleScore(0);
+    setTopicIntroductionText(null);
     
     let generatedPdfDataUri: string | null = null;
     if (pdfFile) {
@@ -183,7 +215,14 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setConfigPdfDataUri(null); 
     }
     
-    fetchInitialQuestion(data.topic, data.educationLevel, data.language, generatedPdfDataUri);
+    // Instead of fetchInitialQuestion, fetch the introduction first
+    fetchTopicIntroduction(data.topic, data.educationLevel, data.language, generatedPdfDataUri);
+  };
+
+  const handleProceedToQuestions = () => {
+    // This will be called after the user reads the introduction
+    const formConfig = configForm.getValues();
+    fetchInitialQuestion(formConfig.topic, formConfig.educationLevel, formConfig.language, configPdfDataUri);
   };
 
   const fetchNextQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, updatedHistory: HistoryItem[], currentPdfDataUri: string | null) => {
@@ -209,6 +248,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
+        // No more questions from the AI, proceed to summary
         setIncorrectlyAnsweredQuestions(updatedHistory.filter(item => typeof item.awardedPoints === 'number' && item.awardedPoints < REVIEW_SCORE_THRESHOLD)); 
         fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, updatedHistory, currentPdfDataUri); 
       }
@@ -422,6 +462,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
           
       setPdfFile(null);
       setConfigPdfDataUri(null);
+      setTopicIntroductionText(null);
       const fileInput = document.getElementById('pdf-upload-input') as HTMLInputElement | null;
       if (fileInput) fileInput.value = "";
 
@@ -457,7 +498,8 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     if (errorMessage && errorMessage.startsWith("Processing PDF...")) return errorMessage; 
     if (isEvaluating && !showExplanationSection) return "Evaluating your answer...";
     if (currentStep === 'loading') {
-        if (!currentQuestionText && !summaryText && history.length === 0 && !isReviewMode) return "Preparing your quiz...";
+        if (topicIntroductionText === null && currentQuestionText === null && history.length === 0 && !isReviewMode) return "Preparing topic introduction...";
+        if (topicIntroductionText !== null && currentQuestionText === null && history.length === 0 && !isReviewMode) return "Preparing your quiz...";
         if (currentQuestionText && !summaryText && !isReviewMode) return "Getting next question...";
         if (isReviewMode && !summaryText) return "Preparing review question...";
         if (summaryText === null && history.length > 0 && !isReviewMode) return "Generating your summary...";
@@ -468,7 +510,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   const formValuesForHeader = configForm.watch();
 
 
-  if ((isLoading || (isEvaluating && !showExplanationSection)) && currentStep !== 'questioning' && currentStep !== 'summary' && currentStep !== 'config' && currentStep !== 'error') {
+  if ((isLoading || (isEvaluating && !showExplanationSection)) && currentStep !== 'questioning' && currentStep !== 'summary' && currentStep !== 'config' && currentStep !== 'error' && currentStep !== 'introduction') {
     return (
       <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
         <CardContent className="p-1 min-h-[300px] flex flex-col items-center justify-center text-center">
@@ -619,8 +661,8 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                   <FormMessage />
                 </FormItem>
                 <Button type="submit" size="lg" className="w-full shadow-md" disabled={isLoading || isEvaluating}>
-                  {isLoading || isEvaluating ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-1 h-5 w-5" />}
-                  Start Quiz
+                  {isLoading || isEvaluating ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <FileQuestion className="mr-1 h-5 w-5" />}
+                  Get Topic Introduction
                 </Button>
               </form>
             </Form>
@@ -634,6 +676,60 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
           </CardFooter>
         </>
       )}
+
+      {currentStep === 'introduction' && topicIntroductionText && (
+        <>
+          <CardHeader className="bg-muted/50 p-1 border-b">
+             <div className="flex justify-between items-center">
+                <div>
+                    <CardTitle className="text-xl text-primary">
+                        Topic Introduction: <span className="font-semibold">{formValuesForHeader.topic}</span>
+                        {configPdfDataUri && <FileText className="inline h-5 w-5 ml-1 align-middle text-muted-foreground" title="PDF Context Active"/>}
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                        Level: {formValuesForHeader.educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {formValuesForHeader.language}
+                    </CardDescription>
+                </div>
+                {configPdfDataUri && (
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="ml-1">
+                                <FileText className="mr-1 h-4 w-4" /> View PDF
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="w-[90vw] max-w-[1200px] h-[90vh] flex flex-col p-0 overflow-hidden">
+                            <DialogHeader className='p-2 border-b'>
+                                <DialogTitle>PDF Document: {pdfFile?.name || 'Uploaded PDF'}</DialogTitle>
+                            </DialogHeader>
+                            <iframe
+                                src={configPdfDataUri}
+                                title="PDF Document Viewer"
+                                className="flex-grow w-full h-full border-0"
+                            />
+                        </DialogContent>
+                    </Dialog>
+                )}
+            </div>
+          </CardHeader>
+          <CardContent className="p-1">
+            <ScrollArea className="h-72 w-full rounded-md border p-1 shadow-inner bg-background/50">
+                <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1 p-1">
+                    <ReactMarkdown>{topicIntroductionText}</ReactMarkdown>
+                </div>
+            </ScrollArea>
+          </CardContent>
+          <CardFooter className="p-1 border-t bg-muted/50 flex flex-col space-y-1">
+            <Button onClick={handleProceedToQuestions} size="lg" className="w-full shadow-md" disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-1 h-5 w-5" />}
+              Start Quiz Questions
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRestartQuiz} className="w-full shadow-sm">
+                <RefreshCw className="mr-1 h-4 w-4" /> Change Topic/Settings
+            </Button>
+          </CardFooter>
+        </>
+      )}
+
 
       {currentStep === 'questioning' && currentQuestionText && (
         <>
@@ -673,7 +769,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
           </CardHeader>
 
            {history.length > 0 && !showExplanationSection && !isReviewMode && (
-            <CardContent className="p-1 max-h-60 overflow-y-auto bg-card z-10 sticky top-0 py-1 px-1">
+            <CardContent className="p-1 max-h-60 overflow-y-auto bg-card z-10 sticky top-0 py-1 px-1 shadow-sm border-b">
               <h3 className="text-md font-semibold text-muted-foreground mb-1 sticky top-0 bg-card z-10 py-1 px-1">Previous Questions:</h3>
               <div className="space-y-1 pt-1">
                 {history.map((item, index) => (
@@ -682,9 +778,14 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                       <MessageCircle className="w-4 h-4 mr-1 text-primary shrink-0 mt-[3px]"/>
                       <div className="flex-1">
                         <span className="font-medium text-card-foreground whitespace-pre-wrap">{item.question}</span>
+                         {typeof item.awardedPoints === 'number' && (
+                            <span className={`ml-1 text-xs font-semibold ${item.awardedPoints >= REVIEW_SCORE_THRESHOLD ? 'text-green-600' : 'text-orange-600'}`}>
+                                ({item.awardedPoints}/{item.possiblePoints})
+                            </span>
+                        )}
                       </div>
                     </div>
-                    <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap prose prose-p:my-1">
+                    <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap prose prose-sm prose-p:my-1">
                       <span className="font-semibold">Your Answer: </span>{item.answer}
                     </p>
                   </div>
@@ -940,4 +1041,3 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     </Card>
   );
 }
-
