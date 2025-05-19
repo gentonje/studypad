@@ -144,9 +144,10 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     console.log("KnowledgeQuizSession: Fetching initial question with input:", { currentTopic, currentEducationLevel, currentLanguage, pdfPresent: !!currentPdfDataUri });
     setIsLoading(true);
     setCurrentStep('loading');
-    if (!errorMessage?.startsWith("Processing PDF...")) {
-        setErrorMessage(null);
-    }
+    // if (!errorMessage?.startsWith("Processing PDF...")) { // This specific check might be too narrow if other loading messages are used
+    //     setErrorMessage(null);
+    // }
+    setErrorMessage(null); // General reset before loading
     setShowExplanationSection(false);
     setCurrentExplanation(null);
     setCurrentImageSuggestion(null);
@@ -215,12 +216,10 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setConfigPdfDataUri(null); 
     }
     
-    // Instead of fetchInitialQuestion, fetch the introduction first
     fetchTopicIntroduction(data.topic, data.educationLevel, data.language, generatedPdfDataUri);
   };
 
   const handleProceedToQuestions = () => {
-    // This will be called after the user reads the introduction
     const formConfig = configForm.getValues();
     fetchInitialQuestion(formConfig.topic, formConfig.educationLevel, formConfig.language, configPdfDataUri);
   };
@@ -248,7 +247,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setCurrentQuestionText(output.nextQuestion);
         setCurrentStep('questioning');
       } else {
-        // No more questions from the AI, proceed to summary
         setIncorrectlyAnsweredQuestions(updatedHistory.filter(item => typeof item.awardedPoints === 'number' && item.awardedPoints < REVIEW_SCORE_THRESHOLD)); 
         fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, updatedHistory, currentPdfDataUri); 
       }
@@ -336,7 +334,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       explanationText = evalOutput.explanation || `Score: ${awardedPointsForThisQuestion}/${MAX_POINTS_PER_QUESTION}. No detailed explanation provided.`;
       imgSuggestion = evalOutput.imageSuggestion;
       console.log("KnowledgeQuizSession: AI Evaluation Image Suggestion:", imgSuggestion);
-
 
       toast({ 
         icon: <Bot className="text-blue-500 mr-1" />, 
@@ -524,7 +521,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     );
   }
   
-  if (errorMessage && currentStep !== 'loading' && !errorMessage.startsWith("Processing PDF...")) { 
+  if (errorMessage && currentStep !== 'loading' && !(errorMessage && errorMessage.startsWith("Processing PDF..."))) { 
     return (
       <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
         <CardHeader className="bg-muted/50 p-1 border-b">
@@ -829,7 +826,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                         </p>
                     )}
                     <AlertDescription className="text-green-700/90 dark:text-green-400/90">
-                        <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1">
+                        <div className="prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1 p-1">
                             <ReactMarkdown>{currentExplanation}</ReactMarkdown>
                         </div>
                       {currentImageSuggestion && (
@@ -944,7 +941,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                                 {item.explanation && (
                                   <div className="mt-1 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
                                     <p className="font-semibold text-green-700 dark:text-green-300">Explanation:</p>
-                                    <div className="text-green-700/90 dark:text-green-400/90 prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1">
+                                    <div className="text-green-700/90 dark:text-green-400/90 prose dark:prose-invert max-w-none whitespace-pre-wrap prose-p:my-1 p-1">
                                         <ReactMarkdown>{item.explanation}</ReactMarkdown>
                                     </div>
                                     {item.imageSuggestion && (
@@ -1041,3 +1038,4 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     </Card>
   );
 }
+
