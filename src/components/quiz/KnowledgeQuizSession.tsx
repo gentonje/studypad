@@ -60,7 +60,7 @@ interface KnowledgeQuizSessionProps {
 }
 
 const MAX_POINTS_PER_QUESTION = 5;
-const REVIEW_SCORE_THRESHOLD = 3; // Questions with score < this threshold will be up for review
+const REVIEW_SCORE_THRESHOLD = 3; 
 
 export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) {
   const [currentStep, setCurrentStep] = useState<'config' | 'questioning' | 'summary' | 'loading' | 'error'>('config');
@@ -295,6 +295,8 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       awardedPointsForThisQuestion = evalOutput.awardedScore;
       explanationText = evalOutput.explanation || `Score: ${awardedPointsForThisQuestion}/${MAX_POINTS_PER_QUESTION}. No detailed explanation provided.`;
       imgSuggestion = evalOutput.imageSuggestion;
+      console.log("KnowledgeQuizSession: AI Evaluation Image Suggestion:", imgSuggestion);
+
 
       toast({ 
         icon: <Bot className="text-blue-500 mr-1" />, 
@@ -346,7 +348,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                 ...updatedMainHistory[mainHistoryIndex], 
                 answer: data.answer,
                 explanation: explanationText,
-                awardedPoints: awardedPointsForThisQuestion, // Update main history score on review too
+                awardedPoints: awardedPointsForThisQuestion, 
             }; 
             setHistory(updatedMainHistory);
         }
@@ -655,14 +657,14 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                                 <FileText className="mr-1 h-4 w-4" /> View PDF
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="w-[90vw] max-w-[1200px] h-[90vh] flex flex-col p-1">
-                            <DialogHeader className='p-1'>
+                        <DialogContent className="w-[90vw] max-w-[1200px] h-[90vh] flex flex-col p-0 overflow-hidden">
+                            <DialogHeader className='p-2 border-b'>
                                 <DialogTitle>PDF Document: {pdfFile?.name || 'Uploaded PDF'}</DialogTitle>
                             </DialogHeader>
                             <iframe
                                 src={configPdfDataUri}
                                 title="PDF Document Viewer"
-                                className="flex-grow border-0 w-full"
+                                className="flex-grow w-full h-full border-0"
                             />
                         </DialogContent>
                     </Dialog>
@@ -681,7 +683,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                       <div className="flex-1">
                         <span className="font-medium text-card-foreground whitespace-pre-wrap">{item.question}</span>
                       </div>
-                       {/* Removed binary correct/incorrect icon here, score provides more detail */}
                     </div>
                     <p className="mt-1 text-muted-foreground pl-[calc(1rem+0.25rem)] whitespace-pre-wrap prose prose-p:my-1">
                       <span className="font-semibold">Your Answer: </span>{item.answer}
@@ -806,14 +807,14 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                                 <FileText className="mr-0.5 h-3 w-3" /> View PDF
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="w-[90vw] max-w-[1200px] h-[90vh] flex flex-col p-1">
-                            <DialogHeader className='p-1'>
+                        <DialogContent className="w-[90vw] max-w-[1200px] h-[90vh] flex flex-col p-0 overflow-hidden">
+                            <DialogHeader className='p-2 border-b'>
                                 <DialogTitle>PDF Document: {pdfFile?.name || 'Uploaded PDF'}</DialogTitle>
                             </DialogHeader>
                             <iframe
                                 src={configPdfDataUri}
                                 title="PDF Document Viewer"
-                                className="flex-grow border-0 w-full"
+                                className="flex-grow w-full h-full border-0"
                             />
                         </DialogContent>
                     </Dialog>
@@ -825,7 +826,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
             {history.length > 0 && (
                 <Card className="bg-background/50 shadow-md m-1">
                     <CardHeader className="p-1">
-                        <CardTitle className="text-lg text-primary flex items-center space-x-1"><Check className="w-5 h-5 mr-1"/>Your Answers & Explanations:</CardTitle>
+                        <CardTitle className="text-lg text-primary flex items-center space-x-1"><MessageCircle className="w-5 h-5 mr-1"/>Your Answers & Explanations:</CardTitle>
                     </CardHeader>
                     <CardContent className="max-h-96 p-1">
                          <ScrollArea className="h-full pr-1">
@@ -834,7 +835,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                             <div key={`summary-hist-${index}-${item.question.substring(0,10)}`} className="text-sm p-1 rounded-md bg-muted/30 border border-border/50 shadow-inner">
                                 <div className="font-medium text-card-foreground flex items-start space-x-1">
                                     <span className="mr-1 flex-1 whitespace-pre-wrap">{index+1}. {item.question}</span>
-                                     {/* Removed binary correct/incorrect icon here, score provides more detail */}
                                 </div>
                                 <p className="text-xs text-muted-foreground pl-1 mt-1 whitespace-pre-wrap prose prose-p:my-1"><span className="font-semibold">Your Answer: </span>{item.answer}</p>
                                 {typeof item.awardedPoints === 'number' && typeof item.possiblePoints === 'number' && (
