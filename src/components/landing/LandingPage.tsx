@@ -1,6 +1,7 @@
 
 "use client";
 
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Brain, Lightbulb, Languages, PlayCircle } from "lucide-react";
@@ -10,9 +11,18 @@ interface LandingPageProps {
 }
 
 export function LandingPage({ onStartQuiz }: LandingPageProps) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null; // Return null on the server and during initial client hydration
+  }
+
   return (
     <div className="animate-fade-in space-y-6 p-2">
-      {/* Section to be removed was here */}
       <div className="grid grid-cols-1 md:grid-cols-1 gap-4 max-w-md mx-auto">
         <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader className="pb-2">
