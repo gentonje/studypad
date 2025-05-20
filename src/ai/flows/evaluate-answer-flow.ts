@@ -37,6 +37,7 @@ export async function evaluateAnswer(input: EvaluateAnswerInput): Promise<Evalua
 
 const evaluateAnswerPrompt = ai.definePrompt({
   name: 'evaluateAnswerPrompt',
+  model: 'googleai/gemini-1.5-flash-latest', // Explicitly set the model
   input: {schema: EvaluateAnswerInputSchema},
   output: {schema: EvaluateAnswerOutputSchema},
   prompt: `You are an expert AI educator evaluating a student's answer to a quiz question. Your goal is to provide a fair score (0-5) and a comprehensive, teacher-like explanation to help the student understand the concept in their chosen language.
@@ -82,28 +83,56 @@ const evaluateAnswerGenkitFlow = ai.defineFlow(
     outputSchema: EvaluateAnswerOutputSchema,
   },
   async (input: EvaluateAnswerInput) => {
-    const {output} = await evaluateAnswerPrompt(input);
-    if (!output || typeof output.awardedScore !== 'number' || !output.explanation) {
-        console.error('AI output for evaluateAnswerFlow was invalid or incomplete:', output);
-        // Determine the language for the error message
-        const langForMessage = input.language || 'English';
-        let errorMessageText = `Could not determine the score or provide a detailed explanation in ${langForMessage} at this time. Please ensure your answer is clear.`;
-        if (langForMessage === 'Spanish') {
-          errorMessageText = `No se pudo determinar la puntuación ni proporcionar una explicación detallada en ${langForMessage} en este momento. Por favor, asegúrese de que su respuesta sea clara.`;
-        } else if (langForMessage === 'French') {
-          errorMessageText = `Impossible de déterminer le score ou de fournir une explication détaillée en ${langForMessage} pour le moment. Veuillez vous assurer que votre réponse est claire.`;
-        }
-        // Add more languages as needed
+    try {
+      const {output} = await evaluateAnswerPrompt(input);
+      if (!output || typeof output.awardedScore !== 'number' || !output.explanation) {
+          console.error('AI output for evaluateAnswerFlow was invalid or incomplete:', output);
+          const langForMessage = input.language || 'English';
+          let errorMessageText = `Could not determine the score or provide a detailed explanation in ${langForMessage} at this time. Please ensure your answer is clear.`;
+          // Add more languages as needed based on SupportedLanguages enum
+          if (langForMessage === 'Spanish') errorMessageText = `No se pudo determinar la puntuación ni proporcionar una explicación detallada en ${langForMessage} en este momento. Por favor, asegúrese de que su respuesta sea clara.`;
+          else if (langForMessage === 'French') errorMessageText = `Impossible de déterminer le score ou de fournir une explication détaillée en ${langForMessage} pour le moment. Veuillez vous assurer que votre réponse est claire.`;
+          else if (langForMessage === 'German') errorMessageText = `Die Punktzahl konnte nicht ermittelt oder eine detaillierte Erklärung in ${langForMessage} erstellt werden. Bitte stellen Sie sicher, dass Ihre Antwort klar ist.`;
+          else if (langForMessage === 'Chinese (Simplified)') errorMessageText = `目前无法确定分数或提供${langForMessage}的详细解释。请确保您的回答清晰。`;
+          else if (langForMessage === 'Japanese') errorMessageText = `現時点ではスコアを決定したり、${langForMessage}での詳細な説明を提供したりすることができませんでした。回答が明確であることを確認してください。`;
+          else if (langForMessage === 'Korean') errorMessageText = `현재 점수를 결정하거나 ${langForMessage}로 자세한 설명을 제공할 수 없습니다. 답변을 명확히 해주십시오.`;
+          else if (langForMessage === 'Arabic') errorMessageText = `تعذر تحديد النتيجة أو تقديم شرح مفصل بـ ${langForMessage} في الوقت الحالي. يرجى التأكد من أن إجابتك واضحة.`;
+          else if (langForMessage === 'Hindi') errorMessageText = `अभी स्कोर निर्धारित नहीं किया जा सका या ${langForMessage} में विस्तृत स्पष्टीकरण प्रदान नहीं किया जा सका। कृपया सुनिश्चित करें कि आपका उत्तर स्पष्ट है।`;
+          else if (langForMessage === 'Swahili') errorMessageText = `Imeshindwa kubaini alama au kutoa maelezo ya kina kwa ${langForMessage} kwa wakati huu. Tafadhali hakikisha jibu lako liko wazi.`;
+          else if (langForMessage === 'Portuguese') errorMessageText = `Não foi possível determinar a pontuação ou fornecer uma explicação detalhada em ${langForMessage} neste momento. Por favor, certifique-se de que sua resposta está clara.`;
+          else if (langForMessage === 'Luganda') errorMessageText = `Tetusobodde kufuna buwendo oba kuwa nnyinnyonnyola ya mu ${langForMessage} mu kiseera kino. Fuba okulaba nga eddamu lyo litegeerekeka.`;
+          else if (langForMessage === 'Kinyarwanda') errorMessageText = `Ntibishoboye kumenya amanota cyangwa gutanga ibisobanuro birambuye mu ${langForMessage} muri iki gihe. Nyabuneka reba neza ko igisubizo cyawe gisobanutse.`;
+          else if (langForMessage === 'Amharic') errorMessageText = `በ${langForMessage} ውጤቱን መወሰን ወይም ዝርዝር ማብራሪያ መስጠት አልተቻለም። እባክዎ መልስዎ ግልጽ መሆኑን ያረጋግጡ።`;
 
-        return { 
-            awardedScore: 0, 
+
+          return { 
+              awardedScore: 0, 
+              explanation: errorMessageText,
+              imageSuggestion: undefined
+          };
+      }
+      return output;
+    } catch (error) {
+        console.error('evaluateAnswerFlow: Error during AI prompt execution:', error);
+        const langForMessage = input.language || 'English';
+        let detail = error instanceof Error ? error.message : "An unknown error occurred";
+        // Sanitize detail to prevent injecting unwanted HTML or script
+        detail = detail.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        
+        let errorMessageText = `An unexpected server error occurred while evaluating your answer for "${input.topic}" in ${langForMessage}. This might be due to a temporary issue with the AI service (e.g., model overloaded), configuration, or a function timeout. Please check server logs if the problem persists. (Details: ${detail})`;
+        
+        if (langForMessage === 'Spanish') errorMessageText = `Ocurrió un error inesperado en el servidor al evaluar su respuesta para "${input.topic}" en ${langForMessage}. Esto podría deberse a un problema temporal con el servicio de IA, la configuración o un tiempo de espera de la función. Por favor, revise los registros del servidor si el problema persiste. (Detalles: ${detail})`;
+        // Add more language-specific error messages as needed
+        
+        return {
+            awardedScore: 0,
             explanation: errorMessageText,
             imageSuggestion: undefined
         };
     }
-    return output;
   }
 );
 
 
     
+
