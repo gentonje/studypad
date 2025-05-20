@@ -12,13 +12,7 @@ interface LandingPageProps {
 export function LandingPage({ onStartQuiz }: LandingPageProps) {
   return (
     <div className="animate-fade-in space-y-6 p-2">
-      <section className="text-center">
-        <h2 className="text-2xl font-semibold mb-2 text-foreground">Welcome!</h2>
-        <p className="text-muted-foreground max-w-md mx-auto">
-          Choose an activity below to begin your personalized learning journey.
-        </p>
-      </section>
-
+      {/* Section to be removed was here */}
       <div className="grid grid-cols-1 md:grid-cols-1 gap-4 max-w-md mx-auto">
         <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
           <CardHeader className="pb-2">
