@@ -12,7 +12,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const GenerateImageInputSchema = z.object({
-  imagePrompt: z.string().describe('A textual prompt to generate an image from. Should be concise, e.g., 1-3 words.'),
+  imagePrompt: z.string().describe('A textual prompt to generate an image from. Should be concise, e.g., 1-3 words that represent a concept.'),
 });
 export type GenerateImageInput = z.infer<typeof GenerateImageInputSchema>;
 
@@ -40,7 +40,12 @@ const generateImageGenkitFlow = ai.defineFlow(
     try {
       const {media} = await ai.generate({
         model: 'googleai/gemini-2.0-flash-exp', // IMPORTANT: Use exactly this model for image generation
-        prompt: `Generate an image based on the following concept, suitable for a quiz explanation: ${input.imagePrompt}`,
+        prompt: `Generate a clear, simple, educational diagram or pictorial representation for the concept: "${input.imagePrompt}".
+The image should be suitable for a quiz explanation.
+If applicable, include clear, legible text labels directly on the image pointing to key parts of the diagram.
+Use a simple and clean color scheme.
+The style should be similar to a textbook diagram, like an illustration of osmosis with labels for "Solute", "Solvent", and "Semi-permeable membrane".
+Focus on clarity and educational value.`,
         config: {
           responseModalities: ['TEXT', 'IMAGE'], // MUST provide both TEXT and IMAGE
         },
@@ -59,3 +64,4 @@ const generateImageGenkitFlow = ai.defineFlow(
     }
   }
 );
+
