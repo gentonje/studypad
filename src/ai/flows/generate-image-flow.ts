@@ -40,12 +40,12 @@ const generateImageGenkitFlow = ai.defineFlow(
     try {
       const {media} = await ai.generate({
         model: 'googleai/gemini-2.0-flash-exp', // IMPORTANT: Use exactly this model for image generation
-        prompt: `Generate a clear, simple, educational diagram or pictorial representation for the concept: "${input.imagePrompt}".
+        prompt: `Generate a **crystal clear, sharp (not blurry)**, simple, educational diagram or pictorial representation for the concept: "${input.imagePrompt}".
 The image should be suitable for a quiz explanation.
-If applicable, include clear, legible text labels directly on the image pointing to key parts of the diagram.
+If applicable, include **clearly legible text labels** directly on the image pointing to key parts of the diagram. **Ensure all text labels have correct spelling.**
 Use a simple and clean color scheme.
 The style should be similar to a textbook diagram, like an illustration of osmosis with labels for "Solute", "Solvent", and "Semi-permeable membrane".
-Focus on clarity and educational value.`,
+Focus on **clarity, legibility, correct spelling, and educational value.**`,
         config: {
           responseModalities: ['TEXT', 'IMAGE'], // MUST provide both TEXT and IMAGE
         },
