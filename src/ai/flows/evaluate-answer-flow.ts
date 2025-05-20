@@ -26,7 +26,7 @@ export type EvaluateAnswerInput = z.infer<typeof EvaluateAnswerInputSchema>;
 const EvaluateAnswerOutputSchema = z.object({
   awardedScore: z.number().min(0).max(5).describe('The score awarded to the user answer, on a scale of 0 to 5. 0: incorrect, 1-2: basic/partially correct, 3: mostly correct with minor issues, 4: very good, 5: excellent/fully comprehensive for the level.'),
   explanation: z.string().describe('A detailed, teacher-like explanation for the score, tailored to the education level and specified language. This should always be provided and aim to help the student understand the underlying concept thoroughly. Provide the explanation in PLAIN TEXT, without Markdown formatting for bold, italics, or tables. Use natural language for structure.'),
-  imageSuggestion: z.string().optional().describe("A one or two-word search term for an image that could visually clarify the explanation, if applicable. Max two words. E.g., 'photosynthesis diagram' or 'volcano eruption'.")
+  imageSuggestion: z.string().optional().describe("A one or two-word search term for an image that could visually clarify the specific explanation being provided. Max two words. E.g., 'wave interference' or 'photon slit' if explaining wave-particle duality.")
 });
 export type EvaluateAnswerOutput = z.infer<typeof EvaluateAnswerOutputSchema>;
 
@@ -70,7 +70,7 @@ Please provide your response in {{#if language}}{{language}}{{else}}English{{/if
     *   If the score is 5, reinforce why the answer is excellent, perhaps adding a bit more relevant detail or context suitable for the \`educationLevel\`.
     *   The explanation MUST be tailored to the student's specified education level and language ({{#if language}}{{language}}{{else}}English{{/if}}). It should help them understand the concept better. Use analogies or simpler terms if appropriate for the level and language.
     *   IMPORTANT: The explanation should be in **PLAIN TEXT** only. Do NOT use Markdown formatting like \`**bold**\`, \`*italics*\`, or table structures. Use natural language and paragraphs for clear separation of ideas.
-3.  \`imageSuggestion\`: If a simple image, diagram, or pictorial could significantly help in understanding the explanation (e.g., for visual concepts like a cell structure, a historical map, a type of rock), provide a one or two-word search term for such an image. Examples: "cell mitosis", "roman aqueduct", "igneous rock". If no image is particularly helpful, omit this field. Maximum two words. These terms should be in English or a broadly understandable format for image search.
+3.  \`imageSuggestion\`: If a simple image, diagram, or pictorial representation of the **specific concept being discussed in YOUR explanation** could significantly help the student understand it better, provide a one or two-word search term for such an image. The term should be **highly relevant to the core idea of your explanation for THIS specific question and answer**. Examples: If explaining wave-particle duality for a double-slit experiment, "wave interference" or "photon slit" might be appropriate. If explaining cell mitosis, "mitotic spindle" or "chromosome alignment". If explaining osmosis, "semipermeable membrane" or "solute concentration". **If no image is particularly helpful for clarifying THIS specific explanation, omit this field.** Maximum two words. These terms should be in English or a broadly understandable format for image search.
 
 Ensure your output strictly adheres to the requested JSON format and that the explanation is thorough, pedagogical, plain text, and in the specified language ({{#if language}}{{language}}{{else}}English{{/if}}).
 `,
@@ -135,4 +135,3 @@ const evaluateAnswerGenkitFlow = ai.defineFlow(
 
 
     
-
