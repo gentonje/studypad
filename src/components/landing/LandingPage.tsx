@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Brain, Lightbulb, Languages, PlayCircle } from "lucide-react";
+import { SemicircleLoader } from "@/components/ui/semicircle-loader"; // Import the new loader
 
 interface LandingPageProps {
   onStartQuiz: () => void;
@@ -18,7 +19,12 @@ export function LandingPage({ onStartQuiz }: LandingPageProps) {
   }, []);
 
   if (!isMounted) {
-    return null; // Return null on the server and during initial client hydration
+    // Show the loader while the component is not yet mounted on the client
+    return (
+      <div className="flex justify-center items-center min-h-[300px]">
+        <SemicircleLoader size={64} />
+      </div>
+    );
   }
 
   return (
