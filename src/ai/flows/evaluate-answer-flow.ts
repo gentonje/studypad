@@ -2,7 +2,7 @@
 'use server';
 /**
  * @fileOverview An AI agent that evaluates a user's answer to a quiz question,
- * providing a score (0-5), detailed explanations, and suggesting images for clarity. Considers an optional PDF for context.
+ * providing a score (0-5), detailed explanations, and suggesting detailed image prompts for clarity. Considers an optional PDF for context.
  *
  * - evaluateAnswer - A function that handles the answer evaluation.
  * - EvaluateAnswerInput - The input type for the evaluateAnswer function.
@@ -26,7 +26,7 @@ export type EvaluateAnswerInput = z.infer<typeof EvaluateAnswerInputSchema>;
 const EvaluateAnswerOutputSchema = z.object({
   awardedScore: z.number().min(0).max(5).describe('The score awarded to the user answer, on a scale of 0 to 5. 0: incorrect, 1-2: basic/partially correct, 3: mostly correct with minor issues, 4: very good, 5: excellent/fully comprehensive for the level.'),
   explanation: z.string().describe('A detailed, teacher-like explanation for the score, tailored to the education level and specified language. This should always be provided and aim to help the student understand the underlying concept thoroughly. Provide the explanation in PLAIN TEXT, without Markdown formatting for bold, italics, or tables. Use natural language for structure.'),
-  imageSuggestion: z.string().optional().describe("A one or two-word search term for an image that could visually clarify the specific explanation being provided. Max two words. E.g., 'wave interference' or 'photon slit' if explaining wave-particle duality.")
+  detailedImagePrompt: z.string().optional().describe("A detailed textual prompt (aim for approximately 100-150 words, which is about 130-200 tokens) for an AI image generator to create an educational image directly relevant to the explanation provided. This prompt should vividly describe the visual needed. If no image is particularly helpful for THIS specific explanation, omit this field.")
 });
 export type EvaluateAnswerOutput = z.infer<typeof EvaluateAnswerOutputSchema>;
 
@@ -70,7 +70,7 @@ Please provide your response in {{#if language}}{{language}}{{else}}English{{/if
     *   If the score is 5, reinforce why the answer is excellent, perhaps adding a bit more relevant detail or context suitable for the \`educationLevel\`.
     *   The explanation MUST be tailored to the student's specified education level and language ({{#if language}}{{language}}{{else}}English{{/if}}). It should help them understand the concept better. Use analogies or simpler terms if appropriate for the level and language.
     *   IMPORTANT: The explanation should be in **PLAIN TEXT** only. Do NOT use Markdown formatting like \`**bold**\`, \`*italics*\`, or table structures. Use natural language and paragraphs for clear separation of ideas.
-3.  \`imageSuggestion\`: If a simple image, diagram, or pictorial representation of the **specific concept being discussed in YOUR explanation** could significantly help the student understand it better, provide a one or two-word search term for such an image. The term should be **highly relevant to the core idea of your explanation for THIS specific question and answer**. Examples: If explaining wave-particle duality for a double-slit experiment, "wave interference" or "photon slit" might be appropriate. If explaining cell mitosis, "mitotic spindle" or "chromosome alignment". If explaining osmosis, "semipermeable membrane" or "solute concentration". **If no image is particularly helpful for clarifying THIS specific explanation, omit this field.** Maximum two words. These terms should be in English or a broadly understandable format for image search.
+3.  \`detailedImagePrompt\`: If a visual representation could significantly help the student understand the **specific concept being discussed in YOUR explanation**, provide a detailed textual prompt for an AI image generator. This prompt should be approximately 100-150 words (around 130-200 tokens) and vividly describe the educational image or diagram needed. The prompt must be highly relevant to the core idea of your explanation for THIS specific question and answer. For example, if explaining wave-particle duality for a double-slit experiment, a detailed prompt might describe "A diagram showing parallel waves approaching two narrow vertical slits. On the other side of the slits, show the waves diffracting and interfering, creating an interference pattern of bright and dark fringes on a distant screen. Label key elements like 'Wavefronts', 'Slits', 'Diffraction', 'Constructive Interference', 'Destructive Interference', and 'Screen'." Or for cell mitosis: "An illustration of a eukaryotic cell in metaphase of mitosis. Clearly show duplicated chromosomes (sister chromatids) aligned along the metaphase plate in the center of the cell. Depict spindle fibers emanating from centrosomes at opposite poles of the cell and attached to the centromeres of each chromosome. Label 'Chromosomes', 'Metaphase Plate', 'Spindle Fibers', 'Centrosomes'." **If no image is particularly helpful for clarifying THIS specific explanation, or if the concept is too abstract for a simple diagram, omit this field.** Ensure the prompt guides towards an educational, clear, and labeled image. These prompts should be in English or a broadly understandable format for image generation.
 
 Ensure your output strictly adheres to the requested JSON format and that the explanation is thorough, pedagogical, plain text, and in the specified language ({{#if language}}{{language}}{{else}}English{{/if}}).
 `,
@@ -99,7 +99,7 @@ const evaluateAnswerGenkitFlow = ai.defineFlow(
           else if (langForMessage === 'Arabic') errorMessageText = `تعذر تحديد النتيجة أو تقديم شرح مفصل بـ ${langForMessage} في الوقت الحالي. يرجى التأكد من أن إجابتك واضحة.`;
           else if (langForMessage === 'Hindi') errorMessageText = `अभी स्कोर निर्धारित नहीं किया जा सका या ${langForMessage} में विस्तृत स्पष्टीकरण प्रदान नहीं किया जा सका। कृपया सुनिश्चित करें कि आपका उत्तर स्पष्ट है।`;
           else if (langForMessage === 'Swahili') errorMessageText = `Imeshindwa kubaini alama au kutoa maelezo ya kina kwa ${langForMessage} kwa wakati huu. Tafadhali hakikisha jibu lako liko wazi.`;
-          else if (langForMessage === 'Portuguese') errorMessageText = `Não foi possível determinar a pontuação ou fornecer uma explicação detalhada em ${langForMessage} neste momento. Por favor, certifique-se de que sua resposta está clara.`;
+          else if (langForMessage === 'Portuguese') errorMessageText = `Não foi possível determinar a pontuação ou fornecer uma explanação detalhada em ${langForMessage} neste momento. Por favor, certifique-se de que sua resposta está clara.`;
           else if (langForMessage === 'Luganda') errorMessageText = `Tetusobodde kufuna buwendo oba kuwa nnyinnyonnyola ya mu ${langForMessage} mu kiseera kino. Fuba okulaba nga eddamu lyo litegeerekeka.`;
           else if (langForMessage === 'Kinyarwanda') errorMessageText = `Ntibishoboye kumenya amanota cyangwa gutanga ibisobanuro birambuye mu ${langForMessage} muri iki gihe. Nyabuneka reba neza ko igisubizo cyawe gisobanutse.`;
           else if (langForMessage === 'Amharic') errorMessageText = `በ${langForMessage} ውጤቱን መወሰን ወይም ዝርዝር ማብራሪያ መስጠት አልተቻለም። እባክዎ መልስዎ ግልጽ መሆኑን ያረጋግጡ።`;
@@ -108,7 +108,7 @@ const evaluateAnswerGenkitFlow = ai.defineFlow(
           return { 
               awardedScore: 0, 
               explanation: errorMessageText,
-              imageSuggestion: undefined
+              detailedImagePrompt: undefined
           };
       }
       return output;
@@ -127,11 +127,8 @@ const evaluateAnswerGenkitFlow = ai.defineFlow(
         return {
             awardedScore: 0,
             explanation: errorMessageText,
-            imageSuggestion: undefined
+            detailedImagePrompt: undefined
         };
     }
   }
 );
-
-
-    

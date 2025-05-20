@@ -23,7 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, ArrowRight, Image as ImageIcon, ExternalLink, Home, Bot, FileText, XCircle, ThumbsUp, FileQuestion } from 'lucide-react';
+import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, ArrowRight, /*ImageIcon,*/ ExternalLink, Home, Bot, FileText, XCircle, ThumbsUp, FileQuestion } from 'lucide-react'; // ImageIcon might be unused now
 import { useToast } from "@/hooks/use-toast";
 
 const readFileAsDataURI = (file: File): Promise<string> => {
@@ -51,7 +51,7 @@ interface HistoryItem {
   question: string;
   answer: string;
   explanation?: string;
-  imageSuggestion?: string;
+  detailedImagePrompt?: string; // Renamed from imageSuggestion
   generatedImageDataUri?: string;
   awardedPoints?: number;
   possiblePoints?: number;
@@ -89,7 +89,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [currentExplanation, setCurrentExplanation] = useState<string | null>(null);
-  const [currentImageSuggestion, setCurrentImageSuggestion] = useState<string | null>(null); // Kept for now if we need it for other purposes
+  const [currentDetailedImagePrompt, setCurrentDetailedImagePrompt] = useState<string | null>(null); 
   const [currentGeneratedImageDataUri, setCurrentGeneratedImageDataUri] = useState<string | null>(null);
   const [showExplanationSection, setShowExplanationSection] = useState(false);
   const [currentAwardedPoints, setCurrentAwardedPoints] = useState<number | null>(null);
@@ -132,7 +132,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       setTopicIntroductionText(output.introductionText);
       setCurrentStep('introduction');
       toast({ title: "Topic Introduction Ready!", description: "Read the introduction below then start the quiz.", variant: "default" });
-       if (currentPdfDataUri) { // If PDF was used for introduction, open it
+       if (currentPdfDataUri) { 
         setIsPdfViewerOpen(true);
       }
     } catch (error) {
@@ -148,13 +148,13 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
 
 
   const fetchInitialQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, currentPdfDataUri: string | null) => {
-    console.log("KnowledgeQuizSession: Fetching initial question with input:", { currentTopic, currentEducationLevel, currentLanguage, pdfPresent: !!currentPdfDataUri });
+    console.log("KnowledgeQuizSession: Fetching initial question:", { currentTopic, currentEducationLevel, currentLanguage, pdfPresent: !!currentPdfDataUri });
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null); 
     setShowExplanationSection(false);
     setCurrentExplanation(null);
-    setCurrentImageSuggestion(null);
+    setCurrentDetailedImagePrompt(null);
     setCurrentGeneratedImageDataUri(null);
     setCurrentAwardedPoints(null);
     try {
@@ -216,13 +216,16 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setConfigPdfDataUri(null); 
         setPdfFile(null); 
       } finally {
-        setIsLoading(false); // Ensure isLoading is set to false after PDF processing attempt
+        setIsLoading(false); 
       }
     } else {
         setConfigPdfDataUri(null); 
     }
     
-    fetchTopicIntroduction(data.topic, data.educationLevel, data.language, generatedPdfDataUri);
+    await fetchTopicIntroduction(data.topic, data.educationLevel, data.language, generatedPdfDataUri);
+    if (generatedPdfDataUri) {
+        setIsPdfViewerOpen(true); // Open PDF viewer automatically after introduction is fetched
+    }
   };
 
   const handleProceedToQuestions = () => {
@@ -231,13 +234,13 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   };
 
   const fetchNextQuestion = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, updatedHistory: HistoryItem[], currentPdfDataUri: string | null) => {
-    console.log("KnowledgeQuizSession: Fetching next question with input:", { currentTopic, currentEducationLevel, currentLanguage, historyLength: updatedHistory.length, pdfPresent: !!currentPdfDataUri });
+    console.log("KnowledgeQuizSession: Fetching next question:", { currentTopic, currentEducationLevel, currentLanguage, historyLength: updatedHistory.length, pdfPresent: !!currentPdfDataUri });
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null);
     setShowExplanationSection(false);
     setCurrentExplanation(null);
-    setCurrentImageSuggestion(null);
+    setCurrentDetailedImagePrompt(null);
     setCurrentGeneratedImageDataUri(null);
     setCurrentAwardedPoints(null);
     try {
@@ -269,13 +272,13 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   };
 
   const fetchQuizSummary = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, finalHistory: HistoryItem[], currentPdfDataUri: string | null) => {
-    console.log("KnowledgeQuizSession: Fetching quiz summary with input:", { currentTopic, currentEducationLevel, currentLanguage, historyLength: finalHistory.length, pdfPresent: !!currentPdfDataUri });
+    console.log("KnowledgeQuizSession: Fetching quiz summary:", { currentTopic, currentEducationLevel, currentLanguage, historyLength: finalHistory.length, pdfPresent: !!currentPdfDataUri });
     setIsLoading(true);
     setCurrentStep('loading');
     setErrorMessage(null);
     setShowExplanationSection(false);
     setCurrentExplanation(null);
-    setCurrentImageSuggestion(null);
+    setCurrentDetailedImagePrompt(null);
     setCurrentGeneratedImageDataUri(null);
     setCurrentAwardedPoints(null);
     try {
@@ -294,8 +297,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
           question: item.question,
           answer: item.answer,
           explanation: item.explanation,
-          imageSuggestion: item.imageSuggestion, 
-          // isCorrect is not used by summary flow directly, awardedPoints would be more relevant if needed
+          imageSuggestion: item.detailedImagePrompt, // Pass detailed prompt if needed by summary
         }))
       };
       const output: QuizSummaryOutput = await getQuizSummary(input);
@@ -318,11 +320,11 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   const handleAnswerSubmit: SubmitHandler<AnswerFormData> = async (data) => {
     if (!currentQuestionText) return;
     setIsEvaluating(true);
-    setIsGeneratingImage(false); // Reset image generation state
-    setCurrentGeneratedImageDataUri(null); // Clear previous image
+    setIsGeneratingImage(false); 
+    setCurrentGeneratedImageDataUri(null); 
     setShowExplanationSection(false);
     setCurrentExplanation(null);
-    setCurrentImageSuggestion(null);
+    setCurrentDetailedImagePrompt(null);
     setCurrentAwardedPoints(null);
     setErrorMessage(null);
     
@@ -331,7 +333,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
 
     let awardedPointsForThisQuestion = 0;
     let explanationText = "Could not retrieve explanation for this answer.";
-    let aiImageSuggestion: string | undefined = undefined;
+    let aiDetailedImagePrompt: string | undefined = undefined;
     let generatedImageForHistory: string | undefined = undefined;
 
     try {
@@ -349,17 +351,21 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       
       awardedPointsForThisQuestion = evalOutput.awardedScore;
       explanationText = evalOutput.explanation || `Score: ${awardedPointsForThisQuestion}/${MAX_POINTS_PER_QUESTION}. No detailed explanation provided.`;
-      aiImageSuggestion = evalOutput.imageSuggestion;
-      setCurrentImageSuggestion(aiImageSuggestion || null); // For potential future use or debugging
+      aiDetailedImagePrompt = evalOutput.detailedImagePrompt;
+      setCurrentDetailedImagePrompt(aiDetailedImagePrompt || null); 
 
-      if (aiImageSuggestion) {
+      if (aiDetailedImagePrompt) {
         setIsGeneratingImage(true);
         try {
-          const imageGenInput: GenerateImageInput = { imagePrompt: aiImageSuggestion };
+          const imageGenInput: GenerateImageInput = { detailedImageDescription: aiDetailedImagePrompt };
+          console.log("KnowledgeQuizSession: Input to generateImage:", JSON.stringify(imageGenInput, null, 2));
           const imageGenOutput: GenerateImageOutput = await generateImage(imageGenInput);
           if (imageGenOutput.imageDataUri) {
+            console.log("KnowledgeQuizSession: Image generated, URI starts with:", imageGenOutput.imageDataUri.substring(0, 50));
             setCurrentGeneratedImageDataUri(imageGenOutput.imageDataUri);
             generatedImageForHistory = imageGenOutput.imageDataUri;
+          } else {
+             console.warn("KnowledgeQuizSession: Image generation output did not contain imageDataUri.");
           }
         } catch (imgError) {
           console.error("KnowledgeQuizSession: Error generating image:", imgError);
@@ -383,7 +389,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       explanationText = `An error occurred while evaluating your answer: ${errorMsg}`;
       toast({ title: "Evaluation Error", description: `Couldn't evaluate answer: ${errorMsg}. See explanation section.`, variant: "destructive", duration: 2000 });
     } finally {
-      setIsEvaluating(false); // This should ideally be set after image generation attempt too if image is part of evaluation display
+      setIsEvaluating(false); 
     }
 
     setCurrentUserScore(prevScore => prevScore + awardedPointsForThisQuestion);
@@ -394,7 +400,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         question: currentQuestionText,
         answer: data.answer,
         explanation: explanationText,
-        imageSuggestion: aiImageSuggestion,
+        detailedImagePrompt: aiDetailedImagePrompt,
         generatedImageDataUri: generatedImageForHistory,
         awardedPoints: awardedPointsForThisQuestion,
         possiblePoints: MAX_POINTS_PER_QUESTION,
@@ -407,7 +413,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
             ...originalQuestionToUpdate, 
             answer: data.answer, 
             explanation: explanationText, 
-            imageSuggestion: aiImageSuggestion,
+            detailedImagePrompt: aiDetailedImagePrompt,
             generatedImageDataUri: generatedImageForHistory,
             awardedPoints: awardedPointsForThisQuestion,
             possiblePoints: MAX_POINTS_PER_QUESTION,
@@ -421,7 +427,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                 ...updatedMainHistory[mainHistoryIndex], 
                 answer: data.answer,
                 explanation: explanationText,
-                imageSuggestion: aiImageSuggestion,
+                detailedImagePrompt: aiDetailedImagePrompt,
                 generatedImageDataUri: generatedImageForHistory,
                 awardedPoints: awardedPointsForThisQuestion, 
             }; 
@@ -439,7 +445,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   const handleProceedToNextQuestion = () => {
     setShowExplanationSection(false);
     setCurrentExplanation(null);
-    setCurrentImageSuggestion(null);
+    setCurrentDetailedImagePrompt(null);
     setCurrentGeneratedImageDataUri(null);
     setCurrentAwardedPoints(null);
     answerForm.reset(); 
@@ -473,7 +479,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setCurrentQuestionText(questionsToReview[0].question);
         answerForm.reset(); 
         setCurrentExplanation(null); 
-        setCurrentImageSuggestion(null); 
+        setCurrentDetailedImagePrompt(null); 
         setCurrentGeneratedImageDataUri(null);
         setShowExplanationSection(false); 
         setCurrentAwardedPoints(null);
@@ -511,6 +517,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       setCurrentTotalPossibleScore(0);
       setCurrentAwardedPoints(null);
       setCurrentGeneratedImageDataUri(null);
+      setCurrentDetailedImagePrompt(null);
 
 
       configForm.reset(); 
@@ -520,7 +527,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       setIsGeneratingImage(false);
       setShowExplanationSection(false);
       setCurrentExplanation(null);
-      setCurrentImageSuggestion(null);
     }
   };
   
@@ -604,7 +610,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                 title={pdfFile?.name || 'Uploaded PDF'}
             />
           ) : (
-            <div className="flex-grow flex items-center justify-center text-muted-foreground p-4">
+            <div className="flex-grow flex items-center justify-center text-muted-foreground p-1">
                 <p>PDF will be displayed here once processed.</p>
             </div>
           )}
@@ -855,14 +861,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
 
                   {showExplanationSection && (currentExplanation || currentGeneratedImageDataUri || isGeneratingImage) && (
                     <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/40 shadow-sm rounded-md p-1 my-1">
-                      <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
-                      <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
-                      {currentAwardedPoints !== null && (
-                          <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
-                              Score: {currentAwardedPoints}/{MAX_POINTS_PER_QUESTION}
-                          </p>
-                      )}
-                      {isGeneratingImage && (
+                       {isGeneratingImage && (
                         <div className="flex items-center justify-center p-1 my-1">
                           <Loader2 className="h-6 w-6 text-green-600 dark:text-green-400 animate-spin mr-1" />
                           <p className="text-sm text-green-700/90 dark:text-green-400/90">Generating image...</p>
@@ -872,13 +871,20 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                         <div className="my-1 p-1">
                            <Image
                                 src={currentGeneratedImageDataUri}
-                                alt={currentImageSuggestion || "Generated visual aid for explanation"}
+                                alt="Visual aid for explanation" // Generic alt text
                                 width={300}
                                 height={200}
                                 className="rounded shadow-md border border-green-300 dark:border-green-600"
-                                unoptimized={currentGeneratedImageDataUri.startsWith('data:image')} // Useful for base64 images
+                                unoptimized={currentGeneratedImageDataUri.startsWith('data:image')} 
                             />
                         </div>
+                      )}
+                      <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
+                      <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
+                      {currentAwardedPoints !== null && (
+                          <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
+                              Score: {currentAwardedPoints}/{MAX_POINTS_PER_QUESTION}
+                          </p>
                       )}
                       {currentExplanation && (
                         <AlertDescription className="text-green-700/90 dark:text-green-400/90">
@@ -966,7 +972,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                                         <div className="my-1">
                                           <Image
                                             src={item.generatedImageDataUri}
-                                            alt={item.imageSuggestion || "Generated visual aid"}
+                                            alt="Visual aid for explanation" // Generic alt text
                                             width={200}
                                             height={150}
                                             className="rounded shadow-sm border border-green-300 dark:border-green-600 my-1"
@@ -993,7 +999,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                       <CardTitle className="text-xl text-primary flex items-center space-x-1 gap-1"><Lightbulb className="w-5 h-5"/>Main Summary</CardTitle>
                   </CardHeader>
                   <CardContent className="p-1">
-                      <div className="text-card-foreground whitespace-pre-wrap prose dark:prose-invert max-w-none prose-p:my-1">
+                      <div className="text-card-foreground whitespace-pre-wrap prose dark:prose-invert max-w-none prose-p:my-1 p-1">
                           <ReactMarkdown>{summaryText}</ReactMarkdown>
                       </div>
                   </CardContent>
