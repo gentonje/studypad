@@ -42,11 +42,11 @@ const generateImageGenkitFlow = ai.defineFlow(
         model: 'googleai/gemini-2.0-flash-exp', // IMPORTANT: Use exactly this model for image generation
         prompt: `Generate an image based on the following detailed description: "${input.detailedImageDescription}".
 The image MUST be a **crystal clear, sharp (not blurry)**, simple, educational diagram or pictorial representation.
-The image should be suitable for a quiz explanation.
+The image should be suitable for a quiz explanation. It should have an **approximate 16:9 aspect ratio**.
 If applicable, include **clearly legible text labels** directly on the image pointing to key parts of the diagram. **Ensure all text labels have correct spelling.**
 Use a simple and clean color scheme.
 The style should be similar to a textbook diagram.
-Focus on **clarity, legibility, correct spelling, and educational value.**`,
+Focus on **clarity, legibility, correct spelling, educational value, and a 16:9 aspect ratio.**`,
         config: {
           responseModalities: ['TEXT', 'IMAGE'], // MUST provide both TEXT and IMAGE
         },

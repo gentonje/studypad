@@ -23,7 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, ArrowRight, /*ImageIcon,*/ ExternalLink, Home, Bot, FileText, XCircle, ThumbsUp, FileQuestion } from 'lucide-react'; // ImageIcon might be unused now
+import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, ArrowRight, ExternalLink, Home, Bot, FileText, XCircle, ThumbsUp, FileQuestion } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const readFileAsDataURI = (file: File): Promise<string> => {
@@ -51,7 +51,7 @@ interface HistoryItem {
   question: string;
   answer: string;
   explanation?: string;
-  detailedImagePrompt?: string; // Renamed from imageSuggestion
+  detailedImagePrompt?: string;
   generatedImageDataUri?: string;
   awardedPoints?: number;
   possiblePoints?: number;
@@ -132,15 +132,19 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       setTopicIntroductionText(output.introductionText);
       setCurrentStep('introduction');
       toast({ title: "Topic Introduction Ready!", description: "Read the introduction below then start the quiz.", variant: "default" });
-       if (currentPdfDataUri) { 
+       if (currentPdfDataUri && output.introductionText && !output.introductionText.toLowerCase().includes("unexpected server error")) { 
         setIsPdfViewerOpen(true);
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching topic introduction:", error);
       const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
-      setErrorMessage(`Sorry, I couldn't get the topic introduction: ${errorMsg}. Please check server logs for more details or try configuring again.`);
+      let displayError = `Sorry, I couldn't get the topic introduction: ${errorMsg}.`;
+      if (errorMsg.includes("Vercel")) { // More specific message if from our Vercel error catch
+         displayError = errorMsg;
+      }
+      setErrorMessage(displayError + " Please check server logs for more details or try configuring again.");
       setCurrentStep('error');
-      toast({ title: "Introduction Error", description: `Failed to load introduction: ${errorMsg}`, variant: "destructive" });
+      toast({ title: "Introduction Error", description: displayError, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -223,9 +227,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     }
     
     await fetchTopicIntroduction(data.topic, data.educationLevel, data.language, generatedPdfDataUri);
-    if (generatedPdfDataUri) {
-        setIsPdfViewerOpen(true); // Open PDF viewer automatically after introduction is fetched
-    }
   };
 
   const handleProceedToQuestions = () => {
@@ -297,7 +298,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
           question: item.question,
           answer: item.answer,
           explanation: item.explanation,
-          imageSuggestion: item.detailedImagePrompt, // Pass detailed prompt if needed by summary
+          imageSuggestion: item.detailedImagePrompt,
         }))
       };
       const output: QuizSummaryOutput = await getQuizSummary(input);
@@ -351,13 +352,13 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       
       awardedPointsForThisQuestion = evalOutput.awardedScore;
       explanationText = evalOutput.explanation || `Score: ${awardedPointsForThisQuestion}/${MAX_POINTS_PER_QUESTION}. No detailed explanation provided.`;
-      aiDetailedImagePrompt = evalOutput.detailedImagePrompt;
+      aiDetailedImagePrompt = evalOutput.detailedImagePrompt; // Use the renamed field
       setCurrentDetailedImagePrompt(aiDetailedImagePrompt || null); 
 
       if (aiDetailedImagePrompt) {
         setIsGeneratingImage(true);
         try {
-          const imageGenInput: GenerateImageInput = { detailedImageDescription: aiDetailedImagePrompt };
+          const imageGenInput: GenerateImageInput = { detailedImageDescription: aiDetailedImagePrompt }; // Pass correct field name
           console.log("KnowledgeQuizSession: Input to generateImage:", JSON.stringify(imageGenInput, null, 2));
           const imageGenOutput: GenerateImageOutput = await generateImage(imageGenInput);
           if (imageGenOutput.imageDataUri) {
@@ -400,7 +401,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         question: currentQuestionText,
         answer: data.answer,
         explanation: explanationText,
-        detailedImagePrompt: aiDetailedImagePrompt,
+        detailedImagePrompt: aiDetailedImagePrompt, // Store detailed prompt
         generatedImageDataUri: generatedImageForHistory,
         awardedPoints: awardedPointsForThisQuestion,
         possiblePoints: MAX_POINTS_PER_QUESTION,
@@ -649,13 +650,11 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                     control={configForm.control}
                     name="educationLevel"
                     render={({ field }) => {
-                      // console.log("[EducationLevel Field Render] field.value:", field.value); 
                       return (
                         <FormItem>
                           <FormLabel className="text-lg">Education Level</FormLabel>
                           <Select
                             onValueChange={(value) => {
-                              // console.log("[EducationLevel Select onValueChange] selected value:", value); 
                               field.onChange(value as EducationLevel);
                             }}
                             value={field.value} 
@@ -861,20 +860,20 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
 
                   {showExplanationSection && (currentExplanation || currentGeneratedImageDataUri || isGeneratingImage) && (
                     <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/40 shadow-sm rounded-md p-1 my-1">
-                       {isGeneratingImage && (
+                      {isGeneratingImage && (
                         <div className="flex items-center justify-center p-1 my-1">
                           <Loader2 className="h-6 w-6 text-green-600 dark:text-green-400 animate-spin mr-1" />
                           <p className="text-sm text-green-700/90 dark:text-green-400/90">Generating image...</p>
                         </div>
                       )}
                       {currentGeneratedImageDataUri && !isGeneratingImage && (
-                        <div className="my-1 p-1">
+                        <div className="my-1 p-1 aspect-w-16 aspect-h-9 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden shadow-md border border-green-300 dark:border-green-600">
                            <Image
                                 src={currentGeneratedImageDataUri}
-                                alt="Visual aid for explanation" // Generic alt text
-                                width={300}
-                                height={200}
-                                className="rounded shadow-md border border-green-300 dark:border-green-600"
+                                alt="Visual aid for explanation"
+                                layout="fill"
+                                objectFit="cover"
+                                className="rounded"
                                 unoptimized={currentGeneratedImageDataUri.startsWith('data:image')} 
                             />
                         </div>
@@ -969,13 +968,13 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                                   {item.explanation && (
                                     <div className="mt-1 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
                                       {item.generatedImageDataUri && (
-                                        <div className="my-1">
+                                        <div className="my-1 aspect-w-16 aspect-h-9 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
                                           <Image
                                             src={item.generatedImageDataUri}
-                                            alt="Visual aid for explanation" // Generic alt text
-                                            width={200}
-                                            height={150}
-                                            className="rounded shadow-sm border border-green-300 dark:border-green-600 my-1"
+                                            alt="Visual aid for explanation"
+                                            layout="fill"
+                                            objectFit="cover"
+                                            className="rounded"
                                             unoptimized={item.generatedImageDataUri.startsWith('data:image')}
                                           />
                                         </div>
