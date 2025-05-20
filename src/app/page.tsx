@@ -22,7 +22,7 @@ const StudentCompanionLogo = () => (
       y="50%"
       dominantBaseline="central"
       textAnchor="middle"
-      fontSize="42"
+      fontSize="38"
       fontWeight="bold"
       fill="currentColor"
       fontFamily="var(--font-geist-sans), Arial, sans-serif"
@@ -44,25 +44,20 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex flex-col items-center min-h-screen bg-background text-foreground p-2 md:p-4 space-y-4">
-      <header className="w-full max-w-xl mx-auto text-center space-y-2">
-        <div className="flex items-center justify-center space-x-2 mb-2">
+    <div className="flex flex-col items-center min-h-screen bg-background text-foreground m-1 p-1 space-y-1">
+      <header className="w-full max-w-md mx-auto text-center p-1 space-y-1">
+        <div className="flex items-center justify-center space-x-1 mb-1">
           <StudentCompanionLogo />
           <h1 className="text-3xl md:text-4xl font-bold text-primary">Student Companion</h1>
         </div>
-        {currentView === 'landing' && (
-          <p className="text-md md:text-lg text-muted-foreground">
-            Your AI-powered partner for learning and knowledge discovery.
-          </p>
-        )}
       </header>
 
-      <main className="w-full max-w-xl mx-auto p-1">
+      <main className="w-full max-w-md mx-auto p-1">
         {currentView === 'landing' && <LandingPage onStartQuiz={handleStartQuiz} />}
         {currentView === 'quiz' && <KnowledgeQuizSession onGoToHome={handleGoToHome} />}
       </main>
 
-      <footer className="w-full max-w-xl mx-auto text-center text-sm text-muted-foreground p-2 space-y-1">
+      <footer className="w-full max-w-md mx-auto text-center text-sm text-muted-foreground p-1 space-y-1">
         <p>&copy; {new Date().getFullYear()} Student Companion. All rights reserved.</p>
         <p className="mt-1">
           This tool is for educational and informational purposes.
