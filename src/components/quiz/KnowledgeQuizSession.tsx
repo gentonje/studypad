@@ -141,18 +141,18 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       setIsFetchingAudio(false); 
       return;
     }
-    const targetLanguage = lang || language || "English"; // Should ideally use a default from SupportedLanguages
+    const targetLanguage = lang || language || "English";
     setIsFetchingAudio(true);
     setCurrentAudioUri(null); 
     try {
-      const ttsInput: TextToSpeechInput = { text }; // Voice ID defaults in the flow
+      const ttsInput: TextToSpeechInput = { text };
       const { audioDataUri } = await textToSpeech(ttsInput);
       console.log("KnowledgeQuizSession: Received audioDataUri from textToSpeech flow (first 50 chars):", audioDataUri ? audioDataUri.substring(0,50) + "..." : "NO_URI_RECEIVED");
       if (audioDataUri) {
         setCurrentAudioUri(audioDataUri);
       } else {
         console.warn("KnowledgeQuizSession: Failed to fetch audio narration (audioDataUri is null or undefined from TTS flow).");
-        toast({ title: "Narration Unavailable", description: `Could not generate audio for this content in ${targetLanguage}. The TTS service might be unavailable or the API key might be missing/invalid.`, variant: "default", duration: 3000 });
+        toast({ title: "Narration Unavailable", description: `Could not generate audio for this content in ${targetLanguage}. The TTS service might be unavailable or the API key is missing/invalid. Please check server logs for specific TTS errors.`, variant: "default", duration: 3000 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching or playing narration:", error);
@@ -190,9 +190,9 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         if (output.introductionText && output.introductionText.includes("Details: ")) { 
             displayError = `Error getting introduction: ${output.introductionText.substring(output.introductionText.indexOf("Details: "))}`;
         } else if (output.introductionText && output.introductionText.includes("could not generate")) {
-             displayError = output.introductionText; // Use AI's direct message if it's a generation failure
+             displayError = output.introductionText; 
         }
-        setErrorMessage(displayError + " Please check server logs or try again.");
+        setErrorMessage(displayError + " Please check server logs for more details or try again.");
         setCurrentStep('error');
         toast({ title: "Introduction Error", description: displayError, variant: "destructive" });
       }
@@ -200,7 +200,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       console.error("KnowledgeQuizSession: Error fetching topic introduction:", error);
       const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
       let displayError = `Sorry, I couldn't get the topic introduction: ${errorMsg}.`;
-      if (errorMsg.toLowerCase().includes("vercel") || errorMsg.toLowerCase().includes("server component") || errorMsg.toLowerCase().includes("server components render") || errorMsg.toLowerCase().includes("invocation")) { 
+      if (errorMsg.toLowerCase().includes("vercel") || errorMsg.toLowerCase().includes("server component") || errorMsg.toLowerCase().includes("server components render") || errorMsg.toLowerCase().includes("invocation") || errorMsg.toLowerCase().includes("server components render")) { 
          displayError = `Server error getting introduction: ${errorMsg}. Please check Vercel function logs for details.`;
       }
       setErrorMessage(displayError + " Try configuring again or check server logs if the problem persists.");
@@ -275,22 +275,19 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         generatedPdfDataUri = await readFileAsDataURI(pdfFile);
         setConfigPdfDataUri(generatedPdfDataUri); 
         toast({ title: "PDF Processed", description: `${pdfFile.name} will be used for context.`, variant: "default" });
-        setErrorMessage(null); // Clear PDF processing message
+        setErrorMessage(null); 
       } catch (error) {
         console.error("KnowledgeQuizSession: Error reading PDF file:", error);
         const errorMsg = error instanceof Error ? error.message : "Could not read file";
         toast({ title: "PDF Error", description: `${errorMsg}. Continuing without PDF.`, variant: "destructive" });
-        setErrorMessage(`Could not process PDF: ${errorMsg}. Continuing without it.`); // Keep this message if PDF fails
+        setErrorMessage(`Could not process PDF: ${errorMsg}. Continuing without it.`); 
         setConfigPdfDataUri(null); 
         setPdfFile(null); 
-      } finally {
-        // Don't set setIsLoading(false) here if we're proceeding to fetchTopicIntroduction
       }
     } else {
         setConfigPdfDataUri(null); 
     }
     
-    // Proceed to fetch introduction regardless of PDF success, using generatedPdfDataUri (which might be null)
     await fetchTopicIntroduction(data.topic, data.educationLevel, data.language, generatedPdfDataUri);
   };
 
@@ -366,7 +363,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
           question: item.question,
           answer: item.answer,
           explanation: item.explanation,
-          // Ensure this matches the expected field name in QuizSummaryInputSchema for QuizSummaryInput
           imageSuggestion: item.detailedImagePrompt, 
         }))
       };
