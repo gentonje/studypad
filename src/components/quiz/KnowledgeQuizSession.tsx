@@ -234,7 +234,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       const { audioDataUri } = await textToSpeech(ttsInput);
       if (!audioDataUri) {
         console.warn("KnowledgeQuizSession: TTS returned no audioDataUri.");
-        if (!process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY && !process.env.ELEVENLABS_API_KEY) { // Check both common env var names
+        if (!process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY) { // Only check the public env var
           toast({ 
             title: "TTS Service Not Configured", 
             description: "The text-to-speech service API key is missing.", 

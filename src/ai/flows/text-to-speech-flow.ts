@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview An AI agent that converts text to speech using ElevenLabs.
@@ -40,6 +39,8 @@ const textToSpeechGenkitFlow = ai.defineFlow(
 
     if (!apiKey || apiKey.trim() === "") {
       console.error('textToSpeechGenkitFlow: CRITICAL - ELEVENLABS_API_KEY is not set or is empty in environment variables.');
+      console.log('textToSpeechGenkitFlow: Environment check - NODE_ENV:', process.env.NODE_ENV);
+      console.log('textToSpeechGenkitFlow: Environment check - VERCEL_ENV:', process.env.VERCEL_ENV);
       console.log('textToSpeechGenkitFlow: Current value of process.env.ELEVENLABS_API_KEY is:', 
         apiKey === undefined ? 'undefined' : 
         (apiKey === null ? 'null' : 
