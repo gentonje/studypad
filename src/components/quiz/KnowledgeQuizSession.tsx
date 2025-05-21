@@ -24,7 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, PlayCircle, BookOpen, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, ArrowRight, Home, Bot, FileText, XCircle, Volume2, CheckCircle2 } from 'lucide-react';
+import { Loader2, PlayCircle, BookOpen, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, ArrowRight, Home, Bot, FileText, XCircle, Volume2, CheckCircle2, ThumbsUp, FileQuestion } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const readFileAsDataURI = (file: File): Promise<string> => {
@@ -127,9 +127,10 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     }
   }, [currentAudioUri]);
 
-  const fetchAndPlayNarration = async (text: string, lang: SupportedLanguage) => {
-    if (!text.trim()) return;
-    console.log("KnowledgeQuizSession: Fetching narration for:", text.substring(0,30) + "...", "Lang:", lang);
+  const fetchAndPlayNarration = async (text: string, lang?: SupportedLanguage) => {
+    if (!text || !text.trim()) return;
+    const targetLanguage = lang || language || "English";
+    console.log("KnowledgeQuizSession: Fetching narration for:", text.substring(0,30) + "...", "Lang:", targetLanguage);
     setIsFetchingAudio(true);
     setCurrentAudioUri(null); // Clear previous audio
     try {
@@ -167,6 +168,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       
       if (output.introductionText && !output.introductionText.toLowerCase().includes("unexpected server error") && !output.introductionText.toLowerCase().includes("model not found")) {
         setTopicIntroductionText(output.introductionText);
+        fetchAndPlayNarration(output.introductionText, currentLanguage);
         setCurrentStep('introduction');
         toast({ title: "Topic Introduction Ready!", description: "Read the introduction below then start the quiz.", variant: "default" });
         if (currentPdfDataUri) { 
@@ -185,8 +187,8 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       console.error("KnowledgeQuizSession: Error fetching topic introduction:", error);
       const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
       let displayError = `Sorry, I couldn't get the topic introduction: ${errorMsg}.`;
-      if (errorMsg.includes("Vercel") || errorMsg.toLowerCase().includes("server component")) { 
-         displayError = errorMsg;
+      if (errorMsg.includes("Vercel") || errorMsg.toLowerCase().includes("server component") || errorMsg.toLowerCase().includes("server components render")) { 
+         displayError = errorMsg + " Please check Vercel function logs for details.";
       }
       setErrorMessage(displayError + " Please check server logs for more details or try configuring again.");
       setCurrentStep('error');
@@ -216,7 +218,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         language: currentLanguage,
         pdfDataUri: currentPdfDataUri 
       };
-      console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow:", JSON.stringify(input, null, 2));
+      // console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow:", JSON.stringify(input, null, 2));
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
@@ -270,7 +272,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setConfigPdfDataUri(null); 
         setPdfFile(null); 
       } finally {
-        setIsLoading(false); 
+        // setIsLoading(false); // Loading state should be managed by fetchTopicIntroduction
       }
     } else {
         setConfigPdfDataUri(null); 
@@ -303,7 +305,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         language: currentLanguage,
         pdfDataUri: currentPdfDataUri, 
       };
-      console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow:", JSON.stringify(input, null, 2));
+      // console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow:", JSON.stringify(input, null, 2));
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
 
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
@@ -355,7 +357,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
           imageSuggestion: item.detailedImagePrompt, // This field name was expected by quiz-summary-flow
         }))
       };
-      console.log("KnowledgeQuizSession: Input to getQuizSummary:", JSON.stringify(input, null, 2));
+      // console.log("KnowledgeQuizSession: Input to getQuizSummary:", JSON.stringify(input, null, 2));
       const output: QuizSummaryOutput = await getQuizSummary(input);
       setSummaryText(output.summary);
       setFurtherLearningSuggestions(output.furtherLearningSuggestions);
@@ -402,7 +404,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         language: formConfig.language,
         pdfDataUri: configPdfDataUri, 
       };
-      console.log("KnowledgeQuizSession: Input to evaluateAnswer:", JSON.stringify(evalInput, null, 2));
+      // console.log("KnowledgeQuizSession: Input to evaluateAnswer:", JSON.stringify(evalInput, null, 2));
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
       console.log("KnowledgeQuizSession: AI Evaluation Output:", JSON.stringify(evalOutput, null, 2)); 
       
@@ -418,7 +420,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setIsGeneratingImage(true);
         try {
           const imageGenInput: GenerateImageInput = { detailedImageDescription: aiDetailedImagePrompt };
-          console.log("KnowledgeQuizSession: Input to generateImage:", JSON.stringify(imageGenInput, null, 2));
+          // console.log("KnowledgeQuizSession: Input to generateImage:", JSON.stringify(imageGenInput, null, 2));
           const imageGenOutput: GenerateImageOutput = await generateImage(imageGenInput);
           if (imageGenOutput.imageDataUri) {
             console.log("KnowledgeQuizSession: Image generated, URI starts with:", imageGenOutput.imageDataUri.substring(0, 50));
@@ -436,7 +438,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       }
 
       toast({ 
-        icon: <Bot className="text-blue-500 mr-1" />, 
+        icon: <ThumbsUp className="text-green-500 mr-1" />, 
         title: "Answer Evaluated!", 
         description: `Score: ${awardedPointsForThisQuestion}/${MAX_POINTS_PER_QUESTION}. See explanation below.`, 
         variant: "default", 
@@ -956,14 +958,14 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                               Score: {currentAwardedPoints}/{MAX_POINTS_PER_QUESTION}
                           </p>
                       )}
-                      {isGeneratingImage && (
+                      {isGeneratingImage && !currentGeneratedImageDataUri && (
                         <div className="flex items-center justify-center p-1 my-1">
                           <Loader2 className="h-6 w-6 text-green-600 dark:text-green-400 animate-spin mr-1" />
                           <p className="text-sm text-green-700/90 dark:text-green-400/90">Generating image...</p>
                         </div>
                       )}
                       {currentGeneratedImageDataUri && !isGeneratingImage && (
-                        <div className="my-1 p-1 aspect-w-16 aspect-h-9 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden shadow-md border border-green-300 dark:border-green-600">
+                        <div className="my-1 aspect-video bg-gray-200 dark:bg-gray-700 rounded overflow-hidden shadow-md border border-green-300 dark:border-green-600 relative">
                            <Image
                                 src={currentGeneratedImageDataUri}
                                 alt="Visual aid for explanation"
@@ -1057,7 +1059,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                                   {item.explanation && (
                                     <div className="mt-1 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/30 text-xs">
                                       {item.generatedImageDataUri && (
-                                        <div className="my-1 aspect-w-16 aspect-h-9 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                                        <div className="my-1 aspect-video bg-gray-200 dark:bg-gray-700 rounded overflow-hidden relative">
                                           <Image
                                             src={item.generatedImageDataUri}
                                             alt="Visual aid for explanation"
