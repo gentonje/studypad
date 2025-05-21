@@ -26,7 +26,7 @@ export default function HomePage() {
       </main>
 
       <footer className="w-full max-w-md mx-auto text-center text-sm text-muted-foreground p-1 space-y-1">
-        <p>&copy; {new Date().getFullYear()} Student Companion. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} My Study Pad. All rights reserved.</p>
         <p className="mt-1">
           This tool is for educational and informational purposes.
         </p>

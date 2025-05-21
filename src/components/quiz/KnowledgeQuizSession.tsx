@@ -145,7 +145,10 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setIsFetchingAudio(true);
     setCurrentAudioUri(null); 
     try {
-      const ttsInput: TextToSpeechInput = { text };
+      const ttsInput: TextToSpeechInput = {
+        text,
+        voiceId: ''
+      };
       const { audioDataUri } = await textToSpeech(ttsInput);
       console.log("KnowledgeQuizSession: Received audioDataUri from textToSpeech flow (first 50 chars):", audioDataUri ? audioDataUri.substring(0,50) + "..." : "NO_URI_RECEIVED");
       if (audioDataUri) {

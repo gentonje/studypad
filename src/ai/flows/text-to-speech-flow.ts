@@ -34,27 +34,32 @@ const textToSpeechGenkitFlow = ai.defineFlow(
     outputSchema: TextToSpeechOutputSchema,
   },
   async (input: TextToSpeechInput) => {
-    console.log("textToSpeechGenkitFlow: Received input:", input.text.substring(0, 50) + "...");
+    console.log("textToSpeechGenkitFlow: Received input for TTS (first 50 chars):", input.text ? input.text.substring(0, 50) + "..." : "EMPTY_TEXT");
+    
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+
+    if (!apiKey || apiKey.trim() === "") {
+      console.error('textToSpeechGenkitFlow: CRITICAL - ELEVENLABS_API_KEY is not set or is empty in environment variables.');
+      console.log('textToSpeechGenkitFlow: Current value of process.env.ELEVENLABS_API_KEY is:', 
+        apiKey === undefined ? 'undefined' : 
+        (apiKey === null ? 'null' : 
+        (apiKey.trim() === '' ? 'an empty string' : 'present but might be whitespace-only'))
+      );
+      return { audioDataUri: undefined };
+    }
+    console.log('textToSpeechGenkitFlow: ELEVENLABS_API_KEY is present.');
+
+    if (!input.text || input.text.trim() === "") {
+      console.warn('textToSpeechGenkitFlow: Received empty or whitespace-only text for TTS. Skipping.');
+      return { audioDataUri: undefined };
+    }
+
     try {
-      const apiKey = process.env.ELEVENLABS_API_KEY;
-      if (!apiKey) {
-        console.error('textToSpeechGenkitFlow: CRITICAL - ELEVENLABS_API_KEY is not set in environment variables.');
-        // Double check the key value itself if this log appears
-        console.log('textToSpeechGenkitFlow: Current value of process.env.ELEVENLABS_API_KEY is:', apiKey === undefined ? 'undefined' : 'an empty string or other falsy value');
-        return { audioDataUri: undefined };
-      }
-      console.log('textToSpeechGenkitFlow: ELEVENLABS_API_KEY is set (at least, it is not undefined or null).');
-
-      if (!input.text || input.text.trim() === "") {
-        console.warn('textToSpeechGenkitFlow: Received empty or whitespace-only text for TTS. Skipping.');
-        return { audioDataUri: undefined };
-      }
-
       const elevenLabs = new ElevenLabsClient({
-        apiKey: apiKey, // Use the checked apiKey variable
+        apiKey: apiKey,
       });
 
-      console.log('textToSpeechGenkitFlow: Calling ElevenLabs API with voiceId:', input.voiceId, 'and model_id: eleven_multilingual_v2');
+      console.log('textToSpeechGenkitFlow: Calling ElevenLabs API with voiceId:', input.voiceId!, 'and model_id: eleven_multilingual_v2');
       const audioStream = await elevenLabs.generate({
         voice: input.voiceId!, // voiceId has a default, so it should be present
         text: input.text,
@@ -68,7 +73,7 @@ const textToSpeechGenkitFlow = ai.defineFlow(
       }
 
       if (chunks.length === 0) {
-        console.warn('textToSpeechGenkitFlow: No audio data received in chunks from ElevenLabs. This could be due to an API error or an issue with the input text/voice.');
+        console.warn('textToSpeechGenkitFlow: No audio data received in chunks from ElevenLabs. This could be due to an API error, empty input text not caught, or an issue with the specified voice/model.');
         return { audioDataUri: undefined };
       }
 
@@ -78,21 +83,28 @@ const textToSpeechGenkitFlow = ai.defineFlow(
       
       return { audioDataUri };
 
-    } catch (error) {
-      console.error('textToSpeechGenkitFlow: Error during ElevenLabs TTS generation:', error);
+    } catch (error: any) {
+      console.error('textToSpeechGenkitFlow: Error during ElevenLabs TTS generation.');
       if (error instanceof Error) {
-        console.error('textToSpeechGenkitFlow: Error name:', error.name);
-        console.error('textToSpeechGenkitFlow: Error message:', error.message);
-        // Log more details if available, like response status from ElevenLabs
-        // This might be vendor-specific, checking for common error properties
-        if ('status' in error) {
-           console.error('textToSpeechGenkitFlow: Error status (if available):', (error as any).status);
+        console.error('textToSpeechGenkitFlow: Error Name:', error.name);
+        console.error('textToSpeechGenkitFlow: Error Message:', error.message);
+        if (error.stack) {
+          console.error('textToSpeechGenkitFlow: Error Stack:', error.stack);
         }
-        if ('response' in error && (error as any).response && 'data' in (error as any).response) {
-           console.error('textToSpeechGenkitFlow: Error response data (if available):', (error as any).response.data);
-        }
-
+      } else {
+        console.error('textToSpeechGenkitFlow: Caught non-Error object:', error);
       }
+      
+      // Attempt to log more details if available (e.g., from HTTP errors)
+      if (error.status) {
+         console.error('textToSpeechGenkitFlow: Error Status (if available from error object):', error.status);
+      }
+      if (error.response && error.response.data) {
+         console.error('textToSpeechGenkitFlow: Error Response Data (if available from error object):', JSON.stringify(error.response.data, null, 2));
+      } else if (error.body) {
+         console.error('textToSpeechGenkitFlow: Error Body (if available from error object):', JSON.stringify(error.body, null, 2));
+      }
+
       return { audioDataUri: undefined };
     }
   }
