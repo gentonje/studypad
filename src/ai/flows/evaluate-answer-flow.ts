@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview An AI agent that evaluates a user's answer to a quiz question,
@@ -26,7 +25,8 @@ export type EvaluateAnswerInput = z.infer<typeof EvaluateAnswerInputSchema>;
 const EvaluateAnswerOutputSchema = z.object({
   awardedScore: z.number().min(0).max(5).describe('The score awarded to the user answer, on a scale of 0 to 5. 0: incorrect, 1-2: basic/partially correct, 3: mostly correct with minor issues, 4: very good, 5: excellent/fully comprehensive for the level.'),
   explanation: z.string().describe('A detailed, teacher-like explanation for the score, tailored to the education level and specified language. This should always be provided and aim to help the student understand the underlying concept thoroughly. Provide the explanation in PLAIN TEXT, without Markdown formatting for bold, italics, or tables. Use natural language for structure.'),
-  detailedImagePrompt: z.string().optional().describe("A detailed textual prompt (aim for approximately 100-150 words, which is about 130-200 tokens) for an AI image generator to create an educational image directly relevant to the explanation provided. This prompt should vividly describe the visual needed. If no image is particularly helpful for THIS specific explanation, omit this field.")
+  detailedImagePrompt: z.string().optional().describe("A detailed textual prompt (aim for approximately 100-150 words, which is about 130-200 tokens) for an AI image generator to create an educational image directly relevant to the explanation provided. This prompt should vividly describe the visual needed. If no image is particularly helpful for THIS specific explanation, omit this field."),
+  generatedImageDataUri: z.string().optional().describe("The data URI of an image generated based on the detailedImagePrompt. This will only be present if an image was successfully generated.")
 });
 export type EvaluateAnswerOutput = z.infer<typeof EvaluateAnswerOutputSchema>;
 
