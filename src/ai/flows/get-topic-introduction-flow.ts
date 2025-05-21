@@ -33,7 +33,7 @@ export async function getTopicIntroduction(input: GetTopicIntroductionInput): Pr
 
 const getTopicIntroductionPrompt = ai.definePrompt({
   name: 'getTopicIntroductionPrompt',
-  model: 'googleai/gemini-1.5-flash-latest', // Explicitly set the model
+  model: 'googleai/gemini-1.5-flash-latest',
   input: {schema: GetTopicIntroductionInputSchema},
   output: {schema: GetTopicIntroductionOutputSchema},
   prompt: `You are an AI assistant that generates detailed and comprehensive introductory study text for a specific topic, tailored to a given education level and language. This text should serve as a primary study material to prepare a user thoroughly for a quiz on this topic.
@@ -66,42 +66,26 @@ const getTopicIntroductionGenkitFlow = ai.defineFlow(
     outputSchema: GetTopicIntroductionOutputSchema,
   },
   async (input: GetTopicIntroductionInput) => {
+    const langForMessage = input.language || 'English';
     try {
       const {output} = await getTopicIntroductionPrompt(input);
       if (!output || typeof output.introductionText !== 'string' || output.introductionText.trim() === '') {
           console.error('AI output for getTopicIntroductionFlow was invalid or empty:', output);
-          const langForMessage = input.language || 'English';
-          let errorMessageText = `Could not generate a detailed introduction for "${input.topic}" in ${langForMessage} at the ${input.educationLevel} level.`;
-          if (langForMessage === 'Spanish') {
-            errorMessageText = `No se pudo generar una introducción detallada para "${input.topic}" en ${langForMessage} para el nivel ${input.educationLevel}.`;
-          } else if (langForMessage === 'French') {
-            errorMessageText = `Impossible de générer une introduction détaillée pour "${input.topic}" en ${langForMessage} pour le niveau ${input.educationLevel}.`;
-          }
+          let errorMessageText = `The AI response for the topic introduction ("${input.topic}") was incomplete or empty in ${langForMessage}.`;
+          if (langForMessage === 'Spanish') errorMessageText = `La respuesta de la IA para la introducción del tema ("${input.topic}") estaba incompleta o vacía en ${langForMessage}.`;
           // Add more languages as needed
-          return { 
-              introductionText: errorMessageText,
-          };
+          throw new Error(errorMessageText);
       }
       return output;
-    } catch (error) {
-      console.error('getTopicIntroductionFlow: Error during AI prompt execution:', error);
-      const langForMessage = input.language || 'English';
-      let detail = error instanceof Error ? error.message : "An unknown error occurred";
-      // Sanitize detail to prevent injecting unwanted HTML or script if it's ever directly rendered, though ReactMarkdown should handle it.
-      detail = detail.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    } catch (error: any) {
+      console.error('getTopicIntroductionFlow: Error during AI prompt execution or processing:', error);
+      let detail = error.message || "An unknown error occurred while generating the topic introduction.";
+      if (error.cause && error.cause.message) detail += ` Cause: ${error.cause.message}`;
       
-      let errorMessageText = `An unexpected server error occurred while generating the introduction for "${input.topic}" in ${langForMessage}. This might be due to a temporary issue with the AI service, configuration, or a function timeout. Please check server logs if the problem persists. (Details: ${detail})`;
-      
-      if (langForMessage === 'Spanish') {
-        errorMessageText = `Ocurrió un error inesperado en el servidor al generar la introducción para "${input.topic}" en ${langForMessage}. Esto podría deberse a un problema temporal con el servicio de IA, la configuración o un tiempo de espera de la función. Por favor, revise los registros del servidor si el problema persiste. (Detalles: ${detail})`;
-      } else if (langForMessage === 'French') {
-        errorMessageText = `Une erreur serveur inattendue s'est produite lors de la génération de l'introduction pour "${input.topic}" en ${langForMessage}. Cela peut être dû à un problème temporaire avec le service d'IA, la configuration ou un délai d'attente de la fonction. Veuillez consulter les journaux du serveur si le problème persiste. (Détails: ${detail})`;
-      }
-      // Add more languages as needed for the error message itself
-      return {
-        introductionText: errorMessageText,
-      };
+      let errorMessageText = `An unexpected server error occurred while generating the introduction for "${input.topic}" in ${langForMessage}. (Details: ${detail})`;
+      if (langForMessage === 'Spanish') errorMessageText = `Ocurrió un error inesperado en el servidor al generar la introducción para "${input.topic}" en ${langForMessage}. (Detalles: ${detail})`;
+      // Add more languages as needed
+      throw new Error(errorMessageText);
     }
   }
 );
-
