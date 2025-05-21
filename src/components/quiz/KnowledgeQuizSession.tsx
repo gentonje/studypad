@@ -2,7 +2,7 @@
 "use client";
 
 import Image from 'next/image';
-import { useState, useEffect, type FormEvent, type ChangeEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import { getQuizSummary, type QuizSummaryInput, type QuizSummaryOutput } from '@
 import { evaluateAnswer, type EvaluateAnswerInput, type EvaluateAnswerOutput } from '@/ai/flows/evaluate-answer-flow';
 import { getTopicIntroduction, type GetTopicIntroductionInput, type GetTopicIntroductionOutput } from '@/ai/flows/get-topic-introduction-flow';
 import { generateImage, type GenerateImageInput, type GenerateImageOutput } from '@/ai/flows/generate-image-flow';
+import { textToSpeech, type TextToSpeechInput, type TextToSpeechOutput } from '@/ai/flows/text-to-speech-flow';
 import { EducationLevels, SupportedLanguages, type EducationLevel, type SupportedLanguage } from '@/ai/flows/types';
 import ReactMarkdown from 'react-markdown';
 
@@ -23,7 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, PlayCircle, BookOpen, CheckCircle2, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, ArrowRight, ExternalLink, Home, Bot, FileText, XCircle, ThumbsUp, FileQuestion } from 'lucide-react';
+import { Loader2, PlayCircle, BookOpen, AlertTriangle, RefreshCw, Send, Lightbulb, MessageCircle, ArrowRight, Home, Bot, FileText, XCircle, Volume2, CheckCircle2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 
 const readFileAsDataURI = (file: File): Promise<string> => {
@@ -84,7 +85,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   const [configPdfDataUri, setConfigPdfDataUri] = useState<string | null>(null);
   const [isPdfViewerOpen, setIsPdfViewerOpen] = useState(false);
 
-
   const [isLoading, setIsLoading] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -97,6 +97,9 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   const [currentUserScore, setCurrentUserScore] = useState(0);
   const [currentTotalPossibleScore, setCurrentTotalPossibleScore] = useState(0);
 
+  const [currentAudioUri, setCurrentAudioUri] = useState<string | null>(null);
+  const [isFetchingAudio, setIsFetchingAudio] = useState(false);
+  const audioPlayerRef = useRef<HTMLAudioElement>(null);
 
   const { toast } = useToast();
 
@@ -116,6 +119,38 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     },
   });
 
+  useEffect(() => {
+    if (currentAudioUri && audioPlayerRef.current) {
+      audioPlayerRef.current.src = currentAudioUri;
+      audioPlayerRef.current.load(); // Important to load new src
+      audioPlayerRef.current.play().catch(e => console.error("Error playing audio:", e));
+    }
+  }, [currentAudioUri]);
+
+  const fetchAndPlayNarration = async (text: string, lang: SupportedLanguage) => {
+    if (!text.trim()) return;
+    console.log("KnowledgeQuizSession: Fetching narration for:", text.substring(0,30) + "...", "Lang:", lang);
+    setIsFetchingAudio(true);
+    setCurrentAudioUri(null); // Clear previous audio
+    try {
+      const ttsInput: TextToSpeechInput = { text };
+      // Potentially map `lang` to a specific voiceId if needed, or rely on ElevenLabs model's multilingual capabilities.
+      // For now, using default voice which should handle multiple languages with eleven_multilingual_v2.
+      const { audioDataUri } = await textToSpeech(ttsInput);
+      if (audioDataUri) {
+        setCurrentAudioUri(audioDataUri);
+      } else {
+        console.warn("KnowledgeQuizSession: Failed to fetch audio narration.");
+      }
+    } catch (error) {
+      console.error("KnowledgeQuizSession: Error fetching or playing narration:", error);
+      toast({ title: "Narration Error", description: "Could not play audio.", variant: "destructive", duration: 2000 });
+    } finally {
+      setIsFetchingAudio(false);
+    }
+  };
+
+
   const fetchTopicIntroduction = async (currentTopic: string, currentEducationLevel: EducationLevel, currentLanguage: SupportedLanguage, currentPdfDataUri: string | null) => {
     console.log("KnowledgeQuizSession: Fetching topic introduction:", { currentTopic, currentEducationLevel, currentLanguage, pdfPresent: !!currentPdfDataUri });
     setIsLoading(true);
@@ -129,17 +164,28 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         pdfDataUri: currentPdfDataUri,
       };
       const output: GetTopicIntroductionOutput = await getTopicIntroduction(input);
-      setTopicIntroductionText(output.introductionText);
-      setCurrentStep('introduction');
-      toast({ title: "Topic Introduction Ready!", description: "Read the introduction below then start the quiz.", variant: "default" });
-       if (currentPdfDataUri && output.introductionText && !output.introductionText.toLowerCase().includes("unexpected server error")) { 
-        setIsPdfViewerOpen(true);
+      
+      if (output.introductionText && !output.introductionText.toLowerCase().includes("unexpected server error") && !output.introductionText.toLowerCase().includes("model not found")) {
+        setTopicIntroductionText(output.introductionText);
+        setCurrentStep('introduction');
+        toast({ title: "Topic Introduction Ready!", description: "Read the introduction below then start the quiz.", variant: "default" });
+        if (currentPdfDataUri) { 
+          setIsPdfViewerOpen(true);
+        }
+      } else {
+        let displayError = output.introductionText || "An unknown error occurred generating the introduction.";
+        if (output.introductionText && output.introductionText.includes("Details: ")) { // Extract detail if present
+            displayError = `Error getting introduction: ${output.introductionText.substring(output.introductionText.indexOf("Details: "))}`;
+        }
+        setErrorMessage(displayError + " Please check server logs or try again.");
+        setCurrentStep('error');
+        toast({ title: "Introduction Error", description: displayError, variant: "destructive" });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching topic introduction:", error);
       const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
       let displayError = `Sorry, I couldn't get the topic introduction: ${errorMsg}.`;
-      if (errorMsg.includes("Vercel")) { // More specific message if from our Vercel error catch
+      if (errorMsg.includes("Vercel") || errorMsg.toLowerCase().includes("server component")) { 
          displayError = errorMsg;
       }
       setErrorMessage(displayError + " Please check server logs for more details or try configuring again.");
@@ -161,6 +207,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setCurrentDetailedImagePrompt(null);
     setCurrentGeneratedImageDataUri(null);
     setCurrentAwardedPoints(null);
+    setCurrentAudioUri(null);
     try {
       const input: KnowledgeQuizInput = { 
         previousAnswers: [], 
@@ -169,9 +216,11 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         language: currentLanguage,
         pdfDataUri: currentPdfDataUri 
       };
+      console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow:", JSON.stringify(input, null, 2));
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
+        fetchAndPlayNarration(output.nextQuestion, currentLanguage);
         setCurrentStep('questioning');
       } else {
         setErrorMessage(`Could not generate the first question for this topic/level${currentPdfDataUri ? '/PDF' : ''}. Please try another combination or check the PDF content.`);
@@ -201,6 +250,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setCurrentUserScore(0);
     setCurrentTotalPossibleScore(0);
     setTopicIntroductionText(null);
+    setCurrentAudioUri(null);
     
     let generatedPdfDataUri: string | null = null;
     if (pdfFile) {
@@ -244,6 +294,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setCurrentDetailedImagePrompt(null);
     setCurrentGeneratedImageDataUri(null);
     setCurrentAwardedPoints(null);
+    setCurrentAudioUri(null);
     try {
       const input: KnowledgeQuizInput = { 
         previousAnswers: updatedHistory.map(h => ({question: h.question, answer: h.answer})), 
@@ -252,10 +303,12 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         language: currentLanguage,
         pdfDataUri: currentPdfDataUri, 
       };
+      console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow:", JSON.stringify(input, null, 2));
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
 
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
+        fetchAndPlayNarration(output.nextQuestion, currentLanguage);
         setCurrentStep('questioning');
       } else {
         setIncorrectlyAnsweredQuestions(updatedHistory.filter(item => typeof item.awardedPoints === 'number' && item.awardedPoints < REVIEW_SCORE_THRESHOLD)); 
@@ -282,6 +335,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setCurrentDetailedImagePrompt(null);
     setCurrentGeneratedImageDataUri(null);
     setCurrentAwardedPoints(null);
+    setCurrentAudioUri(null);
     try {
       const responses = finalHistory.reduce((acc, item, index) => {
         acc[`q${index}_${item.question.substring(0,15).replace(/\s/g,'_')}`] = item.answer;
@@ -298,9 +352,10 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
           question: item.question,
           answer: item.answer,
           explanation: item.explanation,
-          imageSuggestion: item.detailedImagePrompt,
+          imageSuggestion: item.detailedImagePrompt, // This field name was expected by quiz-summary-flow
         }))
       };
+      console.log("KnowledgeQuizSession: Input to getQuizSummary:", JSON.stringify(input, null, 2));
       const output: QuizSummaryOutput = await getQuizSummary(input);
       setSummaryText(output.summary);
       setFurtherLearningSuggestions(output.furtherLearningSuggestions);
@@ -328,6 +383,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setCurrentDetailedImagePrompt(null);
     setCurrentAwardedPoints(null);
     setErrorMessage(null);
+    setCurrentAudioUri(null);
     
     const formConfig = configForm.getValues(); 
     console.log("KnowledgeQuizSession: Handling answer submit for question:", currentQuestionText, "Answer:", data.answer, "Config:", formConfig, "PDF present:", !!configPdfDataUri);
@@ -352,13 +408,16 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       
       awardedPointsForThisQuestion = evalOutput.awardedScore;
       explanationText = evalOutput.explanation || `Score: ${awardedPointsForThisQuestion}/${MAX_POINTS_PER_QUESTION}. No detailed explanation provided.`;
-      aiDetailedImagePrompt = evalOutput.detailedImagePrompt; // Use the renamed field
+      if (explanationText) {
+          fetchAndPlayNarration(explanationText, formConfig.language);
+      }
+      aiDetailedImagePrompt = evalOutput.detailedImagePrompt; 
       setCurrentDetailedImagePrompt(aiDetailedImagePrompt || null); 
 
       if (aiDetailedImagePrompt) {
         setIsGeneratingImage(true);
         try {
-          const imageGenInput: GenerateImageInput = { detailedImageDescription: aiDetailedImagePrompt }; // Pass correct field name
+          const imageGenInput: GenerateImageInput = { detailedImageDescription: aiDetailedImagePrompt };
           console.log("KnowledgeQuizSession: Input to generateImage:", JSON.stringify(imageGenInput, null, 2));
           const imageGenOutput: GenerateImageOutput = await generateImage(imageGenInput);
           if (imageGenOutput.imageDataUri) {
@@ -388,6 +447,9 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
       const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
       explanationText = `An error occurred while evaluating your answer: ${errorMsg}`;
+      if (explanationText) {
+          fetchAndPlayNarration(explanationText, formConfig.language);
+      }
       toast({ title: "Evaluation Error", description: `Couldn't evaluate answer: ${errorMsg}. See explanation section.`, variant: "destructive", duration: 2000 });
     } finally {
       setIsEvaluating(false); 
@@ -401,7 +463,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         question: currentQuestionText,
         answer: data.answer,
         explanation: explanationText,
-        detailedImagePrompt: aiDetailedImagePrompt, // Store detailed prompt
+        detailedImagePrompt: aiDetailedImagePrompt, 
         generatedImageDataUri: generatedImageForHistory,
         awardedPoints: awardedPointsForThisQuestion,
         possiblePoints: MAX_POINTS_PER_QUESTION,
@@ -451,6 +513,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setCurrentAwardedPoints(null);
     answerForm.reset(); 
     setErrorMessage(null);
+    setCurrentAudioUri(null);
     
     const formConfig = configForm.getValues(); 
 
@@ -458,7 +521,9 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         const nextIndex = currentReviewQuestionIndex + 1;
         if (nextIndex < incorrectlyAnsweredQuestions.length) {
             setCurrentReviewQuestionIndex(nextIndex);
-            setCurrentQuestionText(incorrectlyAnsweredQuestions[nextIndex].question);
+            const nextReviewQuestion = incorrectlyAnsweredQuestions[nextIndex].question;
+            setCurrentQuestionText(nextReviewQuestion);
+            fetchAndPlayNarration(nextReviewQuestion, formConfig.language);
             answerForm.setValue('answer', incorrectlyAnsweredQuestions[nextIndex].answer || ''); 
             setCurrentStep('questioning');
         } else {
@@ -477,7 +542,10 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setIncorrectlyAnsweredQuestions(questionsToReview); 
         setIsReviewMode(true);
         setCurrentReviewQuestionIndex(0);
-        setCurrentQuestionText(questionsToReview[0].question);
+        const firstReviewQuestion = questionsToReview[0].question;
+        setCurrentQuestionText(firstReviewQuestion);
+        const formConfig = configForm.getValues();
+        fetchAndPlayNarration(firstReviewQuestion, formConfig.language);
         answerForm.reset(); 
         setCurrentExplanation(null); 
         setCurrentDetailedImagePrompt(null); 
@@ -519,6 +587,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       setCurrentAwardedPoints(null);
       setCurrentGeneratedImageDataUri(null);
       setCurrentDetailedImagePrompt(null);
+      setCurrentAudioUri(null);
 
 
       configForm.reset(); 
@@ -544,6 +613,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
 
   const getLoadingMessage = () => {
     if (errorMessage && errorMessage.startsWith("Processing PDF...")) return errorMessage; 
+    if (isFetchingAudio) return "Preparing audio narration...";
     if (isGeneratingImage && !showExplanationSection) return "Generating image for explanation...";
     if (isEvaluating && !showExplanationSection) return "Evaluating your answer...";
     if (currentStep === 'loading') {
@@ -558,8 +628,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
 
   const formValuesForHeader = configForm.watch();
 
-
-  if ((isLoading || (isEvaluating && !showExplanationSection) || (isGeneratingImage && !showExplanationSection)) && currentStep !== 'questioning' && currentStep !== 'summary' && currentStep !== 'config' && currentStep !== 'error' && currentStep !== 'introduction') {
+  if ((isLoading || (isEvaluating && !showExplanationSection) || (isGeneratingImage && !showExplanationSection) || isFetchingAudio) && currentStep !== 'questioning' && currentStep !== 'summary' && currentStep !== 'config' && currentStep !== 'error' && currentStep !== 'introduction') {
     return (
       <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
         <CardContent className="p-1 min-h-[300px] flex flex-col items-center justify-center text-center">
@@ -617,6 +686,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
           )}
         </DialogContent>
       </Dialog>
+      <audio ref={audioPlayerRef} className="hidden" />
 
       <Card className="w-full shadow-xl rounded-lg overflow-hidden bg-card">
         {currentStep === 'config' && (
@@ -650,11 +720,13 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                     control={configForm.control}
                     name="educationLevel"
                     render={({ field }) => {
+                      // console.log("[EducationLevel Field Render] field.value:", field.value);
                       return (
                         <FormItem>
                           <FormLabel className="text-lg">Education Level</FormLabel>
                           <Select
                             onValueChange={(value) => {
+                              // console.log("[EducationLevel Select onValueChange] selected value:", value);
                               field.onChange(value as EducationLevel);
                             }}
                             value={field.value} 
@@ -727,8 +799,8 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                     {!pdfFile && <FormDescription id="pdf-description" className="text-xs">Upload a PDF to base the quiz on its content.</FormDescription>}
                     <FormMessage />
                   </FormItem>
-                  <Button type="submit" size="lg" className="w-full shadow-md" disabled={isLoading || isEvaluating || isGeneratingImage}>
-                    {isLoading || isEvaluating || isGeneratingImage ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <FileQuestion className="mr-1 h-5 w-5" />}
+                  <Button type="submit" size="lg" className="w-full shadow-md" disabled={isLoading || isEvaluating || isGeneratingImage || isFetchingAudio}>
+                    {isLoading || isEvaluating || isGeneratingImage || isFetchingAudio ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <FileQuestion className="mr-1 h-5 w-5" />}
                     Get Topic Introduction
                   </Button>
                 </form>
@@ -757,11 +829,16 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                           Level: {formValuesForHeader.educationLevel.replace(/([A-Z])/g, ' $1').trim()} | Language: {formValuesForHeader.language}
                       </CardDescription>
                   </div>
-                  {configPdfDataUri && (
-                      <Button variant="outline" size="sm" className="ml-1" onClick={() => setIsPdfViewerOpen(true)}>
-                          <FileText className="mr-1 h-4 w-4" /> View PDF
-                      </Button>
-                  )}
+                  <div className="flex items-center space-x-1">
+                    {configPdfDataUri && (
+                        <Button variant="outline" size="sm" className="ml-1" onClick={() => setIsPdfViewerOpen(true)}>
+                            <FileText className="mr-1 h-4 w-4" /> View PDF
+                        </Button>
+                    )}
+                    <Button variant="ghost" size="icon" onClick={() => topicIntroductionText && fetchAndPlayNarration(topicIntroductionText, formValuesForHeader.language)} disabled={isFetchingAudio} aria-label="Read introduction aloud">
+                        <Volume2 className={`h-5 w-5 ${isFetchingAudio ? 'text-muted-foreground animate-pulse' : 'text-primary'}`} />
+                    </Button>
+                  </div>
               </div>
             </CardHeader>
             <CardContent className="p-1">
@@ -772,8 +849,8 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
               </ScrollArea>
             </CardContent>
             <CardFooter className="p-1 border-t bg-muted/50 flex flex-col space-y-1">
-              <Button onClick={handleProceedToQuestions} size="lg" className="w-full shadow-md" disabled={isLoading}>
-                {isLoading ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-1 h-5 w-5" />}
+              <Button onClick={handleProceedToQuestions} size="lg" className="w-full shadow-md" disabled={isLoading || isFetchingAudio}>
+                {isLoading || isFetchingAudio ? <Loader2 className="mr-1 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-1 h-5 w-5" />}
                 Start Quiz Questions
               </Button>
               <Button variant="outline" size="sm" onClick={handleRestartQuiz} className="w-full shadow-sm">
@@ -790,7 +867,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
               <div className="flex justify-between items-center">
                   <div>
                       <CardTitle className="text-xl text-primary">
-                          {isReviewMode ? "Reviewing: " : "Topic: "}
+                          {isReviewMode ? "Reviewing: " : ""}
                           <span className="font-semibold">{formValuesForHeader.topic}</span>
                           {configPdfDataUri && <FileText className="inline h-5 w-5 ml-1 align-middle text-muted-foreground" title="PDF Context Active"/>}
                       </CardTitle>
@@ -799,11 +876,16 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                           {isReviewMode ? ` Review Question ${currentReviewQuestionIndex + 1} of ${incorrectlyAnsweredQuestions.length}` : ` Question ${history.length + (showExplanationSection ? 0 : 1)}`}
                       </CardDescription>
                   </div>
-                  {configPdfDataUri && (
-                      <Button variant="outline" size="sm" className="ml-1" onClick={() => setIsPdfViewerOpen(true)}>
-                          <FileText className="mr-1 h-4 w-4" /> View PDF
-                      </Button>
-                  )}
+                  <div className="flex items-center space-x-1">
+                    {configPdfDataUri && (
+                        <Button variant="outline" size="sm" className="ml-1" onClick={() => setIsPdfViewerOpen(true)}>
+                            <FileText className="mr-1 h-4 w-4" /> View PDF
+                        </Button>
+                    )}
+                    <Button variant="ghost" size="icon" onClick={() => currentQuestionText && fetchAndPlayNarration(currentQuestionText, formValuesForHeader.language)} disabled={isFetchingAudio || showExplanationSection} aria-label="Read question aloud">
+                        <Volume2 className={`h-5 w-5 ${isFetchingAudio || showExplanationSection ? 'text-muted-foreground animate-pulse' : 'text-primary'}`} />
+                    </Button>
+                  </div>
               </div>
             </CardHeader>
 
@@ -850,7 +932,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                             className="min-h-[100px] text-base resize-none shadow-sm focus:ring-2 focus:ring-primary"
                             {...field}
                             aria-label="Your answer"
-                            disabled={isLoading || isEvaluating || showExplanationSection || isGeneratingImage}
+                            disabled={isLoading || isEvaluating || showExplanationSection || isGeneratingImage || isFetchingAudio}
                           />
                         </FormControl>
                         <FormMessage />
@@ -860,6 +942,20 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
 
                   {showExplanationSection && (currentExplanation || currentGeneratedImageDataUri || isGeneratingImage) && (
                     <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/40 shadow-sm rounded-md p-1 my-1">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center">
+                          <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
+                          <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => currentExplanation && fetchAndPlayNarration(currentExplanation, formValuesForHeader.language)} disabled={isFetchingAudio} aria-label="Read explanation aloud">
+                           <Volume2 className={`h-5 w-5 ${isFetchingAudio ? 'text-muted-foreground animate-pulse' : 'text-green-600 dark:text-green-400'}`} />
+                        </Button>
+                      </div>
+                      {currentAwardedPoints !== null && (
+                          <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
+                              Score: {currentAwardedPoints}/{MAX_POINTS_PER_QUESTION}
+                          </p>
+                      )}
                       {isGeneratingImage && (
                         <div className="flex items-center justify-center p-1 my-1">
                           <Loader2 className="h-6 w-6 text-green-600 dark:text-green-400 animate-spin mr-1" />
@@ -872,18 +968,11 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                                 src={currentGeneratedImageDataUri}
                                 alt="Visual aid for explanation"
                                 layout="fill"
-                                objectFit="cover"
+                                objectFit="contain"
                                 className="rounded"
                                 unoptimized={currentGeneratedImageDataUri.startsWith('data:image')} 
                             />
                         </div>
-                      )}
-                      <Lightbulb className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
-                      <AlertTitle className="font-semibold text-green-700 dark:text-green-300">Explanation</AlertTitle>
-                      {currentAwardedPoints !== null && (
-                          <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
-                              Score: {currentAwardedPoints}/{MAX_POINTS_PER_QUESTION}
-                          </p>
                       )}
                       {currentExplanation && (
                         <AlertDescription className="text-green-700/90 dark:text-green-400/90">
@@ -896,25 +985,25 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                   )}
 
                   {showExplanationSection ? (
-                    <Button onClick={handleProceedToNextQuestion} className="w-full shadow-md" disabled={isLoading || isGeneratingImage}>
-                      {isLoading || isGeneratingImage ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1 h-4 w-4" />}
+                    <Button onClick={handleProceedToNextQuestion} className="w-full shadow-md" disabled={isLoading || isGeneratingImage || isFetchingAudio}>
+                      {isLoading || isGeneratingImage || isFetchingAudio ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1 h-4 w-4" />}
                       {isReviewMode && currentReviewQuestionIndex >= incorrectlyAnsweredQuestions.length -1 ? "Finish Review" : "Next Question"}
                     </Button>
                   ) : (
-                    <Button type="submit" className="w-full shadow-md" disabled={isLoading || isEvaluating || answerForm.formState.isSubmitting || isGeneratingImage}>
-                      {isEvaluating || isGeneratingImage ? (
+                    <Button type="submit" className="w-full shadow-md" disabled={isLoading || isEvaluating || answerForm.formState.isSubmitting || isGeneratingImage || isFetchingAudio}>
+                      {isEvaluating || isGeneratingImage || isFetchingAudio ? (
                         <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                       ) : (
                         <Send className="mr-1 h-4 w-4" />
                       )}
-                      {isGeneratingImage ? 'Generating Image...' : (isEvaluating ? 'Evaluating...' : 'Submit Answer')}
+                      {isFetchingAudio ? 'Preparing Audio...' : (isGeneratingImage ? 'Generating Image...' : (isEvaluating ? 'Evaluating...' : 'Submit Answer'))}
                     </Button>
                   )}
                 </form>
               </Form>
             </CardContent>
             <CardFooter className="p-1 border-t bg-muted/50 flex justify-center">
-              <Button variant="ghost" size="sm" onClick={handleRestartQuiz} className="text-muted-foreground hover:text-destructive" disabled={isLoading || isEvaluating || isGeneratingImage}>
+              <Button variant="ghost" size="sm" onClick={handleRestartQuiz} className="text-muted-foreground hover:text-destructive" disabled={isLoading || isEvaluating || isGeneratingImage || isFetchingAudio}>
                 {onGoToHome ? <Home className="mr-1 h-4 w-4" /> : <RefreshCw className="mr-1 h-4 w-4" />}
                 {onGoToHome ? 'Go to Home' : 'Restart Quiz'}
               </Button>
@@ -973,7 +1062,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                                             src={item.generatedImageDataUri}
                                             alt="Visual aid for explanation"
                                             layout="fill"
-                                            objectFit="cover"
+                                            objectFit="contain"
                                             className="rounded"
                                             unoptimized={item.generatedImageDataUri.startsWith('data:image')}
                                           />
@@ -1038,7 +1127,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
               )}
               {incorrectlyAnsweredQuestions.length === 0 && history.length > 0 && !isReviewMode && (
                   <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700/40 shadow-sm rounded-md p-1 my-1">
-                      <ThumbsUp className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
+                      <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mr-1" />
                       <AlertTitle className="font-semibold text-green-700 dark:text-green-300">All Answers Scored Well!</AlertTitle>
                       <AlertDescription className="text-green-700/90 dark:text-green-400/90">
                           Congratulations! You scored {REVIEW_SCORE_THRESHOLD} or more on all questions.
