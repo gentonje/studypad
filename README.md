@@ -1,5 +1,3 @@
 # Firebase Studio
 
-This is a NextJS starter in Firebase Studio.
-
-To get started, take a look at src/app/page.tsx.
+This is an app to helps understand various topics abd content and also revice for institutional exams
