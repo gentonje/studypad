@@ -23,7 +23,17 @@ const TextToSpeechOutputSchema = z.object({
 export type TextToSpeechOutput = z.infer<typeof TextToSpeechOutputSchema>;
 
 export async function textToSpeech(input: TextToSpeechInput): Promise<TextToSpeechOutput> {
-  return textToSpeechGenkitFlow(input);
+  // Add caching headers for Vercel
+  const headers = {
+    'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+  };
+  
+  try {
+    return await textToSpeechGenkitFlow(input);
+  } catch (error) {
+    console.error('textToSpeech: Error in text-to-speech flow:', error);
+    return { audioDataUri: undefined };
+  }
 }
 
 const textToSpeechGenkitFlow = ai.defineFlow(
@@ -41,12 +51,13 @@ const textToSpeechGenkitFlow = ai.defineFlow(
       console.error('textToSpeechGenkitFlow: CRITICAL - ELEVENLABS_API_KEY is not set or is empty in environment variables.');
       console.log('textToSpeechGenkitFlow: Environment check - NODE_ENV:', process.env.NODE_ENV);
       console.log('textToSpeechGenkitFlow: Environment check - VERCEL_ENV:', process.env.VERCEL_ENV);
+      console.log('textToSpeechGenkitFlow: Environment check - NEXT_PUBLIC_VERCEL_ENV:', process.env.NEXT_PUBLIC_VERCEL_ENV);
       console.log('textToSpeechGenkitFlow: Current value of process.env.ELEVENLABS_API_KEY is:', 
         apiKey === undefined ? 'undefined' : 
         (apiKey === null ? 'null' : 
         (apiKey.trim() === '' ? 'an empty string' : 'present but might be whitespace-only'))
       );
-      return { audioDataUri: undefined };
+      throw new Error('ELEVENLABS_API_KEY is not configured. Please check your environment variables.');
     }
     console.log('textToSpeechGenkitFlow: ELEVENLABS_API_KEY is present.');
 

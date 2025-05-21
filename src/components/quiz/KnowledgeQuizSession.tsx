@@ -868,9 +868,11 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                            <Image
                                 src={currentGeneratedImageDataUri}
                                 alt={currentDetailedImagePrompt || "Visual aid for explanation"}
-                                layout="fill"
-                                objectFit="contain"
-                                className="rounded"
+                                fill
+                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                className="object-contain rounded"
+                                priority={false}
+                                loading="lazy"
                                 unoptimized={currentGeneratedImageDataUri.startsWith('data:image')} 
                                 title={currentDetailedImagePrompt || "Click to view full size"}
                             />
@@ -960,9 +962,11 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                                           <Image
                                             src={item.generatedImageDataUri}
                                             alt={item.detailedImagePrompt || "Visual aid for explanation"}
-                                            layout="fill"
-                                            objectFit="contain"
-                                            className="rounded"
+                                            fill
+                                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                            className="object-contain rounded"
+                                            priority={false}
+                                            loading="lazy"
                                             unoptimized={item.generatedImageDataUri.startsWith('data:image')}
                                             title={item.detailedImagePrompt || "Click to view full size"}
                                           />
