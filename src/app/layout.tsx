@@ -5,12 +5,12 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 const inter = Inter({
-  variable: '--font-geist-sans',
+  variable: '--font-sans', // Changed from --font-geist-sans
   subsets: ['latin'],
 });
 
 const robotoMono = Roboto_Mono({
-  variable: '--font-geist-mono',
+  variable: '--font-mono', // Changed from --font-geist-mono
   subsets: ['latin'],
 });
 

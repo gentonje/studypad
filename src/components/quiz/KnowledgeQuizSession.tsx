@@ -120,11 +120,11 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   });
 
   useEffect(() => {
-    console.log("KnowledgeQuizSession: useEffect for audio playback triggered. currentAudioUri:", currentAudioUri);
+    console.log("KnowledgeQuizSession: useEffect for audio playback triggered. currentAudioUri (first 50 chars):", currentAudioUri ? currentAudioUri.substring(0,50) + "..." : "NULL_AUDIO_URI");
     if (currentAudioUri && audioPlayerRef.current) {
-      console.log("KnowledgeQuizSession: Attempting to play audio. Ref src:", audioPlayerRef.current.src);
+      console.log("KnowledgeQuizSession: Attempting to play audio. Current audioPlayerRef.current.src (first 50 chars):", audioPlayerRef.current.src ? audioPlayerRef.current.src.substring(0,50) + "..." : "NO_SRC_YET");
       audioPlayerRef.current.src = currentAudioUri;
-      audioPlayerRef.current.load(); 
+      audioPlayerRef.current.load(); // Ensure the new src is loaded
       audioPlayerRef.current.play().catch(e => console.error("KnowledgeQuizSession: Error playing audio:", e));
     } else if (!currentAudioUri) {
         console.log("KnowledgeQuizSession: currentAudioUri is null or empty, not playing audio.");
@@ -135,28 +135,28 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
 
   const fetchAndPlayNarration = async (text: string, lang?: SupportedLanguage) => {
     console.log("KnowledgeQuizSession: fetchAndPlayNarration called with text (first 50 chars):", text ? text.substring(0, 50) + "..." : "EMPTY_TEXT", "Lang:", lang || language);
-    if (!text || !text.trim()) {
+    if (!text || text.trim() === "") {
       console.warn("KnowledgeQuizSession: Empty or whitespace-only text received for narration. Skipping TTS call.");
-      setCurrentAudioUri(null); // Ensure no old audio plays
-      setIsFetchingAudio(false); // Ensure loading state is reset
+      setCurrentAudioUri(null); 
+      setIsFetchingAudio(false); 
       return;
     }
-    const targetLanguage = lang || language || "English";
+    const targetLanguage = lang || language || "English"; // Should ideally use a default from SupportedLanguages
     setIsFetchingAudio(true);
     setCurrentAudioUri(null); 
     try {
-      const ttsInput: TextToSpeechInput = { text };
+      const ttsInput: TextToSpeechInput = { text }; // Voice ID defaults in the flow
       const { audioDataUri } = await textToSpeech(ttsInput);
       console.log("KnowledgeQuizSession: Received audioDataUri from textToSpeech flow (first 50 chars):", audioDataUri ? audioDataUri.substring(0,50) + "..." : "NO_URI_RECEIVED");
       if (audioDataUri) {
         setCurrentAudioUri(audioDataUri);
       } else {
-        console.warn("KnowledgeQuizSession: Failed to fetch audio narration (audioDataUri is null or undefined).");
-        toast({ title: "Narration Unavailable", description: "Could not generate audio for this content.", variant: "default", duration: 2000 });
+        console.warn("KnowledgeQuizSession: Failed to fetch audio narration (audioDataUri is null or undefined from TTS flow).");
+        toast({ title: "Narration Unavailable", description: `Could not generate audio for this content in ${targetLanguage}. The TTS service might be unavailable or the API key might be missing/invalid.`, variant: "default", duration: 3000 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching or playing narration:", error);
-      toast({ title: "Narration Error", description: "Could not play audio.", variant: "destructive", duration: 2000 });
+      toast({ title: "Narration Error", description: `Could not play audio in ${targetLanguage}.`, variant: "destructive", duration: 2000 });
     } finally {
       setIsFetchingAudio(false);
     }
@@ -177,7 +177,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       };
       const output: GetTopicIntroductionOutput = await getTopicIntroduction(input);
       
-      if (output.introductionText && !output.introductionText.toLowerCase().includes("unexpected server error") && !output.introductionText.toLowerCase().includes("model not found")) {
+      if (output.introductionText && !output.introductionText.toLowerCase().includes("unexpected server error") && !output.introductionText.toLowerCase().includes("model not found") && !output.introductionText.toLowerCase().includes("could not generate")) {
         setTopicIntroductionText(output.introductionText);
         fetchAndPlayNarration(output.introductionText, currentLanguage);
         setCurrentStep('introduction');
@@ -186,9 +186,11 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
           setIsPdfViewerOpen(true);
         }
       } else {
-        let displayError = output.introductionText || "An unknown error occurred generating the introduction.";
+        let displayError = output.introductionText || `An unknown error occurred generating the introduction for "${currentTopic}" in ${currentLanguage}.`;
         if (output.introductionText && output.introductionText.includes("Details: ")) { 
             displayError = `Error getting introduction: ${output.introductionText.substring(output.introductionText.indexOf("Details: "))}`;
+        } else if (output.introductionText && output.introductionText.includes("could not generate")) {
+             displayError = output.introductionText; // Use AI's direct message if it's a generation failure
         }
         setErrorMessage(displayError + " Please check server logs or try again.");
         setCurrentStep('error');
@@ -198,10 +200,10 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       console.error("KnowledgeQuizSession: Error fetching topic introduction:", error);
       const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
       let displayError = `Sorry, I couldn't get the topic introduction: ${errorMsg}.`;
-      if (errorMsg.includes("Vercel") || errorMsg.toLowerCase().includes("server component") || errorMsg.toLowerCase().includes("server components render")) { 
-         displayError = errorMsg + " Please check Vercel function logs for details.";
+      if (errorMsg.toLowerCase().includes("vercel") || errorMsg.toLowerCase().includes("server component") || errorMsg.toLowerCase().includes("server components render") || errorMsg.toLowerCase().includes("invocation")) { 
+         displayError = `Server error getting introduction: ${errorMsg}. Please check Vercel function logs for details.`;
       }
-      setErrorMessage(displayError + " Please check server logs for more details or try configuring again.");
+      setErrorMessage(displayError + " Try configuring again or check server logs if the problem persists.");
       setCurrentStep('error');
       toast({ title: "Introduction Error", description: displayError, variant: "destructive" });
     } finally {
@@ -235,7 +237,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         fetchAndPlayNarration(output.nextQuestion, currentLanguage);
         setCurrentStep('questioning');
       } else {
-        setErrorMessage(`Could not generate the first question for this topic/level${currentPdfDataUri ? '/PDF' : ''}. Please try another combination or check the PDF content.`);
+        setErrorMessage(`Could not generate the first question for "${currentTopic}" in ${currentLanguage} at the ${currentEducationLevel} level${currentPdfDataUri ? '/PDF' : ''}. Please try another combination or check the PDF content.`);
         fetchQuizSummary(currentTopic, currentEducationLevel, currentLanguage, [], currentPdfDataUri);
       }
     } catch (error) {
@@ -273,19 +275,22 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         generatedPdfDataUri = await readFileAsDataURI(pdfFile);
         setConfigPdfDataUri(generatedPdfDataUri); 
         toast({ title: "PDF Processed", description: `${pdfFile.name} will be used for context.`, variant: "default" });
-        setErrorMessage(null);
+        setErrorMessage(null); // Clear PDF processing message
       } catch (error) {
         console.error("KnowledgeQuizSession: Error reading PDF file:", error);
         const errorMsg = error instanceof Error ? error.message : "Could not read file";
         toast({ title: "PDF Error", description: `${errorMsg}. Continuing without PDF.`, variant: "destructive" });
-        setErrorMessage(`Could not process PDF: ${errorMsg}. Continuing without it.`);
+        setErrorMessage(`Could not process PDF: ${errorMsg}. Continuing without it.`); // Keep this message if PDF fails
         setConfigPdfDataUri(null); 
         setPdfFile(null); 
+      } finally {
+        // Don't set setIsLoading(false) here if we're proceeding to fetchTopicIntroduction
       }
     } else {
         setConfigPdfDataUri(null); 
     }
     
+    // Proceed to fetch introduction regardless of PDF success, using generatedPdfDataUri (which might be null)
     await fetchTopicIntroduction(data.topic, data.educationLevel, data.language, generatedPdfDataUri);
   };
 
@@ -384,6 +389,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
 
   const handleAnswerSubmit: SubmitHandler<AnswerFormData> = async (data) => {
     if (!currentQuestionText) return;
+    console.log("KnowledgeQuizSession: handleAnswerSubmit called for question:", currentQuestionText.substring(0,50) + "...", "Answer:", data.answer.substring(0,50) + "...");
     setIsEvaluating(true);
     setIsGeneratingImage(false); 
     setCurrentGeneratedImageDataUri(null); 
@@ -395,10 +401,10 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     setCurrentAudioUri(null);
     
     const formConfig = configForm.getValues(); 
-    console.log("KnowledgeQuizSession: Handling answer submit for question:", currentQuestionText, "Answer:", data.answer, "Config:", formConfig, "PDF present:", !!configPdfDataUri);
+    
 
     let awardedPointsForThisQuestion = 0;
-    let explanationText = "Could not retrieve explanation for this answer.";
+    let explanationText = `Could not retrieve explanation for this answer in ${formConfig.language}.`;
     let aiDetailedImagePrompt: string | undefined = undefined;
     let generatedImageForHistory: string | undefined = undefined;
 
@@ -411,11 +417,12 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         language: formConfig.language,
         pdfDataUri: configPdfDataUri, 
       };
+      console.log("KnowledgeQuizSession: Calling evaluateAnswer with input:", JSON.stringify(evalInput, null, 2));
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
       console.log("KnowledgeQuizSession: AI Evaluation Output:", JSON.stringify(evalOutput, null, 2)); 
       
       awardedPointsForThisQuestion = evalOutput.awardedScore;
-      explanationText = evalOutput.explanation || `Score: ${awardedPointsForThisQuestion}/${MAX_POINTS_PER_QUESTION}. No detailed explanation provided.`;
+      explanationText = evalOutput.explanation || `Score: ${awardedPointsForThisQuestion}/${MAX_POINTS_PER_QUESTION}. No detailed explanation provided in ${formConfig.language}.`;
       if (explanationText) {
           fetchAndPlayNarration(explanationText, formConfig.language);
       }
@@ -426,6 +433,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setIsGeneratingImage(true);
         try {
           const imageGenInput: GenerateImageInput = { detailedImageDescription: aiDetailedImagePrompt };
+          console.log("KnowledgeQuizSession: Calling generateImage with input:", JSON.stringify(imageGenInput, null, 2));
           const imageGenOutput: GenerateImageOutput = await generateImage(imageGenInput);
           if (imageGenOutput.imageDataUri) {
             console.log("KnowledgeQuizSession: Image generated, URI starts with:", imageGenOutput.imageDataUri.substring(0, 50));
@@ -443,7 +451,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
       }
 
       toast({ 
-        icon: <ThumbsUp className="text-green-500 mr-1" />, 
+        icon: <ThumbsUp className="mr-1 h-4 w-4 text-green-500" />, 
         title: "Answer Evaluated!", 
         description: `Score: ${awardedPointsForThisQuestion}/${MAX_POINTS_PER_QUESTION}. See explanation below.`, 
         variant: "default", 
@@ -453,7 +461,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     } catch (error) {
       console.error("KnowledgeQuizSession: Error evaluating answer:", error);
       const errorMsg = error instanceof Error ? error.message : "An unknown error occurred";
-      explanationText = `An error occurred while evaluating your answer: ${errorMsg}`;
+      explanationText = `An error occurred while evaluating your answer in ${formConfig.language}: ${errorMsg}`;
       if (explanationText) {
           fetchAndPlayNarration(explanationText, formConfig.language);
       }
@@ -727,11 +735,13 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                     control={configForm.control}
                     name="educationLevel"
                     render={({ field }) => {
+                      // console.log("[EducationLevel Field Render] field.value:", field.value);
                       return (
                         <FormItem>
                           <FormLabel className="text-lg">Education Level</FormLabel>
                           <Select
                             onValueChange={(value) => {
+                              // console.log("[EducationLevel Select onValueChange] selected value:", value);
                               field.onChange(value as EducationLevel);
                             }}
                             value={field.value} 
@@ -996,11 +1006,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                     </Button>
                   ) : (
                     <Button type="submit" className="w-full shadow-md" disabled={isLoading || isEvaluating || answerForm.formState.isSubmitting || isGeneratingImage || isFetchingAudio}>
-                      {isEvaluating || isGeneratingImage || isFetchingAudio ? (
-                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="mr-1 h-4 w-4" />
-                      )}
+                      {isFetchingAudio ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : (isGeneratingImage ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : (isEvaluating ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />))}
                       {isFetchingAudio ? 'Preparing Audio...' : (isGeneratingImage ? 'Generating Image...' : (isEvaluating ? 'Evaluating...' : 'Submit Answer'))}
                     </Button>
                   )}
@@ -1152,5 +1158,3 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     </>
   );
 }
-
-    

@@ -66,9 +66,9 @@ export default {
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
   		},
-  		fontFamily: { // Ensure --font-geist-sans is primary sans-serif
-        sans: ["var(--font-geist-sans)"],
-        mono: ["var(--font-geist-mono)"],
+  		fontFamily: { 
+        sans: ["var(--font-sans)"], // Changed from var(--font-geist-sans)
+        mono: ["var(--font-mono)"],   // Changed from var(--font-geist-mono)
       },
   		keyframes: {
   			'accordion-down': {
