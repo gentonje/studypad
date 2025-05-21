@@ -120,28 +120,39 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   });
 
   useEffect(() => {
+    console.log("KnowledgeQuizSession: useEffect for audio playback triggered. currentAudioUri:", currentAudioUri);
     if (currentAudioUri && audioPlayerRef.current) {
+      console.log("KnowledgeQuizSession: Attempting to play audio. Ref src:", audioPlayerRef.current.src);
       audioPlayerRef.current.src = currentAudioUri;
-      audioPlayerRef.current.load(); // Important to load new src
-      audioPlayerRef.current.play().catch(e => console.error("Error playing audio:", e));
+      audioPlayerRef.current.load(); 
+      audioPlayerRef.current.play().catch(e => console.error("KnowledgeQuizSession: Error playing audio:", e));
+    } else if (!currentAudioUri) {
+        console.log("KnowledgeQuizSession: currentAudioUri is null or empty, not playing audio.");
+    } else if (!audioPlayerRef.current) {
+        console.warn("KnowledgeQuizSession: audioPlayerRef.current is null, cannot play audio.");
     }
   }, [currentAudioUri]);
 
   const fetchAndPlayNarration = async (text: string, lang?: SupportedLanguage) => {
-    if (!text || !text.trim()) return;
+    console.log("KnowledgeQuizSession: fetchAndPlayNarration called with text (first 50 chars):", text ? text.substring(0, 50) + "..." : "EMPTY_TEXT", "Lang:", lang || language);
+    if (!text || !text.trim()) {
+      console.warn("KnowledgeQuizSession: Empty or whitespace-only text received for narration. Skipping TTS call.");
+      setCurrentAudioUri(null); // Ensure no old audio plays
+      setIsFetchingAudio(false); // Ensure loading state is reset
+      return;
+    }
     const targetLanguage = lang || language || "English";
-    console.log("KnowledgeQuizSession: Fetching narration for:", text.substring(0,30) + "...", "Lang:", targetLanguage);
     setIsFetchingAudio(true);
-    setCurrentAudioUri(null); // Clear previous audio
+    setCurrentAudioUri(null); 
     try {
       const ttsInput: TextToSpeechInput = { text };
-      // Potentially map `lang` to a specific voiceId if needed, or rely on ElevenLabs model's multilingual capabilities.
-      // For now, using default voice which should handle multiple languages with eleven_multilingual_v2.
       const { audioDataUri } = await textToSpeech(ttsInput);
+      console.log("KnowledgeQuizSession: Received audioDataUri from textToSpeech flow (first 50 chars):", audioDataUri ? audioDataUri.substring(0,50) + "..." : "NO_URI_RECEIVED");
       if (audioDataUri) {
         setCurrentAudioUri(audioDataUri);
       } else {
-        console.warn("KnowledgeQuizSession: Failed to fetch audio narration.");
+        console.warn("KnowledgeQuizSession: Failed to fetch audio narration (audioDataUri is null or undefined).");
+        toast({ title: "Narration Unavailable", description: "Could not generate audio for this content.", variant: "default", duration: 2000 });
       }
     } catch (error) {
       console.error("KnowledgeQuizSession: Error fetching or playing narration:", error);
@@ -176,7 +187,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         }
       } else {
         let displayError = output.introductionText || "An unknown error occurred generating the introduction.";
-        if (output.introductionText && output.introductionText.includes("Details: ")) { // Extract detail if present
+        if (output.introductionText && output.introductionText.includes("Details: ")) { 
             displayError = `Error getting introduction: ${output.introductionText.substring(output.introductionText.indexOf("Details: "))}`;
         }
         setErrorMessage(displayError + " Please check server logs or try again.");
@@ -218,7 +229,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         language: currentLanguage,
         pdfDataUri: currentPdfDataUri 
       };
-      // console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow:", JSON.stringify(input, null, 2));
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
         setCurrentQuestionText(output.nextQuestion);
@@ -240,7 +250,7 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
   };
 
   const handleConfigSubmit: SubmitHandler<ConfigFormData> = async (data) => {
-    console.log("KnowledgeQuizSession: Config form submitted with data:", data);
+    console.log("KnowledgeQuizSession: Config form submitted with data:", JSON.stringify(data));
     setTopic(data.topic); 
     setEducationLevel(data.educationLevel); 
     setLanguage(data.language); 
@@ -271,8 +281,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setErrorMessage(`Could not process PDF: ${errorMsg}. Continuing without it.`);
         setConfigPdfDataUri(null); 
         setPdfFile(null); 
-      } finally {
-        // setIsLoading(false); // Loading state should be managed by fetchTopicIntroduction
       }
     } else {
         setConfigPdfDataUri(null); 
@@ -305,7 +313,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         language: currentLanguage,
         pdfDataUri: currentPdfDataUri, 
       };
-      // console.log("KnowledgeQuizSession: Input to knowledgeQuizFlow:", JSON.stringify(input, null, 2));
       const output: KnowledgeQuizOutput = await knowledgeQuizFlow(input);
 
       if (output.nextQuestion && output.nextQuestion.trim() !== "") {
@@ -354,10 +361,10 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
           question: item.question,
           answer: item.answer,
           explanation: item.explanation,
-          imageSuggestion: item.detailedImagePrompt, // This field name was expected by quiz-summary-flow
+          // Ensure this matches the expected field name in QuizSummaryInputSchema for QuizSummaryInput
+          imageSuggestion: item.detailedImagePrompt, 
         }))
       };
-      // console.log("KnowledgeQuizSession: Input to getQuizSummary:", JSON.stringify(input, null, 2));
       const output: QuizSummaryOutput = await getQuizSummary(input);
       setSummaryText(output.summary);
       setFurtherLearningSuggestions(output.furtherLearningSuggestions);
@@ -404,7 +411,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         language: formConfig.language,
         pdfDataUri: configPdfDataUri, 
       };
-      // console.log("KnowledgeQuizSession: Input to evaluateAnswer:", JSON.stringify(evalInput, null, 2));
       const evalOutput: EvaluateAnswerOutput = await evaluateAnswer(evalInput);
       console.log("KnowledgeQuizSession: AI Evaluation Output:", JSON.stringify(evalOutput, null, 2)); 
       
@@ -420,7 +426,6 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
         setIsGeneratingImage(true);
         try {
           const imageGenInput: GenerateImageInput = { detailedImageDescription: aiDetailedImagePrompt };
-          // console.log("KnowledgeQuizSession: Input to generateImage:", JSON.stringify(imageGenInput, null, 2));
           const imageGenOutput: GenerateImageOutput = await generateImage(imageGenInput);
           if (imageGenOutput.imageDataUri) {
             console.log("KnowledgeQuizSession: Image generated, URI starts with:", imageGenOutput.imageDataUri.substring(0, 50));
@@ -722,13 +727,11 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
                     control={configForm.control}
                     name="educationLevel"
                     render={({ field }) => {
-                      // console.log("[EducationLevel Field Render] field.value:", field.value);
                       return (
                         <FormItem>
                           <FormLabel className="text-lg">Education Level</FormLabel>
                           <Select
                             onValueChange={(value) => {
-                              // console.log("[EducationLevel Select onValueChange] selected value:", value);
                               field.onChange(value as EducationLevel);
                             }}
                             value={field.value} 
@@ -1149,3 +1152,5 @@ export function KnowledgeQuizSession({ onGoToHome }: KnowledgeQuizSessionProps) 
     </>
   );
 }
+
+    
