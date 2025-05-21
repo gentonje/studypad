@@ -36,11 +36,14 @@ const textToSpeechGenkitFlow = ai.defineFlow(
   async (input: TextToSpeechInput) => {
     console.log("textToSpeechGenkitFlow: Received input:", input.text.substring(0, 50) + "...");
     try {
-      if (!process.env.ELEVENLABS_API_KEY) {
+      const apiKey = process.env.ELEVENLABS_API_KEY;
+      if (!apiKey) {
         console.error('textToSpeechGenkitFlow: CRITICAL - ELEVENLABS_API_KEY is not set in environment variables.');
+        // Double check the key value itself if this log appears
+        console.log('textToSpeechGenkitFlow: Current value of process.env.ELEVENLABS_API_KEY is:', apiKey === undefined ? 'undefined' : 'an empty string or other falsy value');
         return { audioDataUri: undefined };
       }
-      console.log('textToSpeechGenkitFlow: ELEVENLABS_API_KEY is set.');
+      console.log('textToSpeechGenkitFlow: ELEVENLABS_API_KEY is set (at least, it is not undefined or null).');
 
       if (!input.text || input.text.trim() === "") {
         console.warn('textToSpeechGenkitFlow: Received empty or whitespace-only text for TTS. Skipping.');
@@ -48,10 +51,10 @@ const textToSpeechGenkitFlow = ai.defineFlow(
       }
 
       const elevenLabs = new ElevenLabsClient({
-        apiKey: process.env.ELEVENLABS_API_KEY,
+        apiKey: apiKey, // Use the checked apiKey variable
       });
 
-      console.log('textToSpeechGenkitFlow: Calling ElevenLabs API with voiceId:', input.voiceId);
+      console.log('textToSpeechGenkitFlow: Calling ElevenLabs API with voiceId:', input.voiceId, 'and model_id: eleven_multilingual_v2');
       const audioStream = await elevenLabs.generate({
         voice: input.voiceId!, // voiceId has a default, so it should be present
         text: input.text,
@@ -65,7 +68,7 @@ const textToSpeechGenkitFlow = ai.defineFlow(
       }
 
       if (chunks.length === 0) {
-        console.warn('textToSpeechGenkitFlow: No audio data received in chunks from ElevenLabs.');
+        console.warn('textToSpeechGenkitFlow: No audio data received in chunks from ElevenLabs. This could be due to an API error or an issue with the input text/voice.');
         return { audioDataUri: undefined };
       }
 
@@ -80,6 +83,15 @@ const textToSpeechGenkitFlow = ai.defineFlow(
       if (error instanceof Error) {
         console.error('textToSpeechGenkitFlow: Error name:', error.name);
         console.error('textToSpeechGenkitFlow: Error message:', error.message);
+        // Log more details if available, like response status from ElevenLabs
+        // This might be vendor-specific, checking for common error properties
+        if ('status' in error) {
+           console.error('textToSpeechGenkitFlow: Error status (if available):', (error as any).status);
+        }
+        if ('response' in error && (error as any).response && 'data' in (error as any).response) {
+           console.error('textToSpeechGenkitFlow: Error response data (if available):', (error as any).response.data);
+        }
+
       }
       return { audioDataUri: undefined };
     }
